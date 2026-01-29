@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1769277295773,
+      "tag": "0000_odd_next_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1769628788097,
+      "tag": "0001_broad_slyde",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1769630598308,
+      "tag": "0002_cuddly_sasquatch",
+      "breakpoints": true
+    }
+  ]
+}
