@@ -297,7 +297,7 @@ const users = mysqlTable(
 
     email_verified_at: timestamp("email_verified_at", { mode: "string" }),
 
-    password: varchar({ length: 255 }).notNull(),
+    password: varchar({ length: 255 }),
     two_factor_secret: varchar("two_factor_secret", { length: 255 }),
     two_factor_recovery_codes: mysqlSet([
       "code1",

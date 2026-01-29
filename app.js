@@ -14,11 +14,11 @@ const analyticsRouter = require("./routers/analyticsRouter/analytics.router");
 const app = express();
 app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-
+// Serve static files from public directory (for uploads)
+app.use('/storage', express.static('./public/storage'));
 
 // Home route
 app.get("/", (req, res) => {
