@@ -89,11 +89,14 @@ app.post("/api/ads/:id/click", (req, res) => {
 // Analytics routes
 app.use("/api/analytics", analyticsRouter);
 
+// Profile routes
+app.use("/api/settings/profile", profileRouter);
+
+
+
 // Settings routes
 app.use("/api/settings", settingsRouter);
 
-// Profile routes
-app.use("/api/settings/profile", profileRouter);
 
 // Performance metrics
 app.get("/api/settings/performance", (req, res) => {

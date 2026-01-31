@@ -12,6 +12,7 @@ const {
   validatePassword,
   sendInvitationEmail,
 } = require("./utils.users.management.controller");
+const { uploadImageHelper } = require("../utils");
 
 /**
  * POST /api/users/invite
@@ -139,25 +140,9 @@ const inviteUser = async (req, res) => {
  */
 const uploadInviteImage = async (req, res) => {
   try {
-    // Check if file was uploaded by multer
-    if (!req.file) {
-      return res.status(422).json({
-        status: 422,
-        message: "Validation failed",
-        errors: {
-          image: ["The image field is required"],
-        },
-      });
-    }
 
     // Build relative path from uploaded file
-    const relativePath = `users/${req.file.filename}`;
-
-    // Return path and public URL
-    const baseUrl = process.env.APP_URL || "http://localhost:8000";
-    const publicUrl = `${baseUrl}/storage/${relativePath}`;
-
-    console.log(`Image uploaded successfully: ${req.file.filename}`);
+      const { path: relativePath, url: publicUrl } = uploadImageHelper(req,res);
 
     return res.status(200).json({
       status: 200,

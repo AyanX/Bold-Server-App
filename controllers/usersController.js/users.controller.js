@@ -343,14 +343,14 @@ const deleteUser = async (req, res) => {
     // Delete user
     await db.delete(users).where(eq(users.id, Number(id)));
 
-    console.log(`🗑️ User deleted:`, userName);
+    console.log(` User deleted:`, userName);
 
     return res.status(200).json({
       message: "User deleted successfully",
       status: 200,
     });
   } catch (error) {
-    console.error("❌ Error deleting user:", error);
+    console.error(" Error deleting user:", error);
     res.status(500).json({
       message: "Internal server error",
       status: 500,

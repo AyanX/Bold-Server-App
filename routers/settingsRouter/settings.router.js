@@ -1,25 +1,18 @@
 const express = require('express');
+const { getSettings,putSettings,passwordUpdate } = require('../../controllers/settingsController/settings.controller');
 
 const settingsRouter = express.Router();
 
-settingsRouter.get("/", (req, res) => {
-    res.json({ message: "api working" })
-})
+settingsRouter.get("/",getSettings)
 
 settingsRouter.get("/group/:group", (req, res) => {
     res.json({ message: "api working" })
 })
-settingsRouter.put("/", (req, res) => {
-    res.json({ message: "api working" })
-})
+settingsRouter.put("/", putSettings)
 
-settingsRouter.put("/:key", (req, res) => {
-    res.json({ message: "api working" })
-})
+settingsRouter.put("/:key",putSettings)
 
-settingsRouter.post("/password", (req, res) => {
-    res.json({ message: "api working" })
-})
+settingsRouter.post("/password", passwordUpdate)
 
 settingsRouter.get("/export", (req, res) => {
     res.json({ message: "api working" })

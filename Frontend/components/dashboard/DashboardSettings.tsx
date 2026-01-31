@@ -115,13 +115,22 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ profileData, setP
     const fetchSettings = async () => {
       try {
         const res = await api.settings.getAll();
-        if (res.data) {
-          if (res.data.general) setSiteSettings(prev => ({ ...prev, ...res.data.general }));
-          if (res.data.appearance) setAppearanceSettings(prev => ({ ...prev, ...res.data.appearance }));
-          if (res.data.notifications) setNotificationSettings(prev => ({ ...prev, ...res.data.notifications }));
-          if (res.data.seo) setSeoSettings(prev => ({ ...prev, ...res.data.seo }));
-          if (res.data.content) setContentSettings(prev => ({ ...prev, ...res.data.content }));
-          if (res.data.security) setSecuritySettings(prev => ({ ...prev, ...res.data.security }));
+        if (res.data && Array.isArray(res.data)) {
+          // Transform array to grouped object
+          const groupedSettings: Record<string, Record<string, any>> = {};
+          res.data.forEach((setting: any) => {
+            const group = setting.group || 'general';
+            if (!groupedSettings[group]) groupedSettings[group] = {};
+            groupedSettings[group][setting.key] = setting.value;
+          });
+
+          // Update states with fetched values, keeping hard-coded as fallback
+          if (groupedSettings.general) setSiteSettings(prev => ({ ...prev, ...groupedSettings.general }));
+          if (groupedSettings.appearance) setAppearanceSettings(prev => ({ ...prev, ...groupedSettings.appearance }));
+          if (groupedSettings.notifications) setNotificationSettings(prev => ({ ...prev, ...groupedSettings.notifications }));
+          if (groupedSettings.seo) setSeoSettings(prev => ({ ...prev, ...groupedSettings.seo }));
+          if (groupedSettings.content) setContentSettings(prev => ({ ...prev, ...groupedSettings.content }));
+          if (groupedSettings.security) setSecuritySettings(prev => ({ ...prev, ...groupedSettings.security }));
         }
       } catch (error) {
         console.error('Failed to fetch settings:', error);
@@ -139,7 +148,7 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ profileData, setP
             bio: res.data.bio || prev.bio,
           }));
           if (res.data.image) {
-            setProfileImage(`http://localhost:8000/storage/${res.data.image}`);
+            setProfileImage(res.data.image);
           }
         }
       } catch (error) {
