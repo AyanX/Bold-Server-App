@@ -10,15 +10,29 @@ const profileRouter = require("./routers/profileRouter/profile.router");
 const cors = require("cors");
 const authRouter = require("./routers/authRouter/auth.router");
 const analyticsRouter = require("./routers/analyticsRouter/analytics.router");
+const cookieParser = require("cookie-parser");
+const cookieParserMiddleware = require("./utils/middleware/cookieParser");
 
 const app = express();
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  }),
+);
+
+app.use(cookieParser());
 
 // Serve static files from public directory (for uploads)
-app.use('/storage', express.static('./public/storage'));
+app.use("/storage", express.static("./public/storage"));
+
+//ATTACH USER FROM COOKIE TOKEN
+app.use(cookieParserMiddleware);
 
 // Home route
 app.get("/", (req, res) => {

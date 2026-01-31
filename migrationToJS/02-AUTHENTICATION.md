@@ -23,8 +23,8 @@ interface LoginRequest {
 **JSON Example:**
 ```json
 {
-  "email": "user@example.com",
-  "password": "password123"
+  "email": "xhadyayan@gmail.com",
+  "password": "robotic123"
 }
 ```
 

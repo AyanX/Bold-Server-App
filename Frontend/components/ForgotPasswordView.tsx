@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_CONFIG } from '../constants/config';
 
 const ForgotPasswordView: React.FC = () => {
   const [step, setStep] = useState(1); // 1: Email, 2: OTP/Reset
@@ -54,9 +55,10 @@ const ForgotPasswordView: React.FC = () => {
     setMessage('');
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/forgot-password', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email }),
       });
       const data = await response.json();
@@ -84,9 +86,10 @@ const ForgotPasswordView: React.FC = () => {
     setMessage('');
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/forgot-password', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email }),
       });
       const data = await response.json();
@@ -133,9 +136,10 @@ const ForgotPasswordView: React.FC = () => {
     setMessage('');
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/reset-password', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           email,
           otp,

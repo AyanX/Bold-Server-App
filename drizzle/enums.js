@@ -10,6 +10,7 @@ const userStatusEnum = mysqlEnum("user_status", [
   "Active",
   "Inactive",
   "Suspended",
+  "Pending",
 ]);
 
 

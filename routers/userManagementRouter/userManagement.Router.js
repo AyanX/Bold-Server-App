@@ -49,7 +49,7 @@ const upload = multer({
 const userManagementRouter = express.Router();
 
 // Invitation routes
-userManagementRouter.post("/invite", inviteUser);
+// userManagementRouter.post("/invite", inviteUser);
 userManagementRouter.post("/invite/image", upload.single('image'), uploadInviteImage);
 userManagementRouter.post("/accept-invitation", acceptInvitation);
 userManagementRouter.get("/invitations/list", getInvitationsList);

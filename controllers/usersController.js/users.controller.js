@@ -18,11 +18,6 @@ const getAllUsers = async (req, res) => {
     const { search } = req.query;
     let query = db.select().from(users);
 
-    // Optional search by name or email
-    if (search && search.trim()) {
-      const searchTerm = `%${search.trim()}%`;
-      query = query.where(like(users.name, searchTerm));
-    }
 
     const allUsers = await query;
 

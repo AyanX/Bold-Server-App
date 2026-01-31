@@ -1,33 +1,11 @@
 const express = require("express");
 const { status } = require("express/lib/response");
+const { login, signup } = require("../../controllers/authController/auth.controller");
 const authRouter = express.Router();
 
 // Auth routes
-authRouter.post("/api/login", (req, res) => {
-  //pass and email check logic here
-
-  //    if (response.ok && result.data) {
-  //   const userData: User = {
-  //     id: result.data.id.toString(),
-  //     name: result.data.name,
-  //     email: result.data.email,
-  //     role: result.data.role,
-  //   };
-  //   setUser(userData);
-  //   setIsLoggedIn(true);
-  //   return true;
-  // }
-
-  //fake check logic
-
-  // Simulate a successful login
-
-  return res.status(200).json({
-    message: "api working",
-    status  : "ok",
-    data: { id: 1, name: "John Doe", email: "ayan@example.com", role: "admin" },
-  });
-});
+authRouter.post("/api/signup", signup);
+authRouter.post("/api/login", login);
 
 authRouter.post("/api/logout", (req, res) => {
   //clear cookies or tokens here

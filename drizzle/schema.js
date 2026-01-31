@@ -277,7 +277,7 @@ const userInvitations = mysqlTable(
     otpCode: varchar("otp_code", { length: 255 }),
     otpHash: varchar("otp_hash", { length: 255 }),
     otpExpiresAt: timestamp("otp_expires_at", { mode: "string" }),
-    invitedBy: bigint("invited_by", { mode: "number", unsigned: true }),
+    invitedBy: varchar("invited_by", { length: 255 }),
     status: varchar({ length: 255 }).default("pending").notNull(),
     createdAt: timestamp("created_at", { mode: "string" }),
     updatedAt: timestamp("updated_at", { mode: "string" }),
@@ -307,7 +307,7 @@ const users = mysqlTable(
       "code5",
     ])("two_factor_recovery_codes"),
     role: userRoleEnum.default("Contributor").notNull(),
-    status: userStatusEnum.default("Active").notNull(),
+    status: userStatusEnum.default("Pending").notNull(),
 
     department: varchar({ length: 255 }),
     phone: varchar({ length: 255 }),
@@ -316,7 +316,7 @@ const users = mysqlTable(
     image: varchar({ length: 255 }),
 
     invited_via: varchar("invited_via", { length: 255 }),
-    invited_by: bigint("invited_by", { mode: "number", unsigned: true }),
+    invited_by: varchar("invited_by", { length: 255 }),
     invitation_accepted_at: timestamp("invitation_accepted_at", {
       mode: "string",
     }),

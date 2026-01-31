@@ -6,6 +6,7 @@ const {
   updateUser,
   deleteUser,
 } = require('../../controllers/usersController.js/users.controller');
+const { inviteUser } = require('../../controllers/usersManagementController/users.management.controller');
 
 const usersRouter = express.Router();
 
@@ -13,7 +14,9 @@ const usersRouter = express.Router();
 usersRouter.get("/", getAllUsers);
 
 // POST create a new user
-usersRouter.post("/", createUser);
+// usersRouter.post("/", createUser);
+
+usersRouter.post("/", inviteUser);
 
 // GET single user by ID
 usersRouter.get("/:id", getUserById);

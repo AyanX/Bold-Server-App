@@ -25,7 +25,7 @@ export const APP_CONFIG = {
  */
 export const API_CONFIG = {
   /** Base API URL */
-  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  BASE_URL: '/api',
   /** Request timeout in milliseconds */
   TIMEOUT: 30000,
   /** Cache TTL in milliseconds */
