@@ -1,4 +1,7 @@
+//  /api/analytics/track
+
 const express = require('express');
+const { postAnalyticsData } = require('../../controllers/analyticsController/analytics.controller');
 const analyticsRouter = express.Router();
 
 analyticsRouter.get("/dashboard", (req, res) => {
@@ -66,8 +69,6 @@ analyticsRouter.get("/active-visitors", (req, res) => {
     res.json({ message: "api working" })
 })
 
-analyticsRouter.post("/track", (req, res) => {
-    res.json({ message: "api working" })
-})
+analyticsRouter.post("/track", postAnalyticsData)
 
 module.exports = analyticsRouter;

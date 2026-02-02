@@ -1,5 +1,7 @@
+// api/settings
+
 const express = require('express');
-const { getSettings,putSettings,passwordUpdate } = require('../../controllers/settingsController/settings.controller');
+const { getSettings,putSettings,passwordUpdate, getSystemStats } = require('../../controllers/settingsController/settings.controller');
 
 const settingsRouter = express.Router();
 
@@ -18,9 +20,7 @@ settingsRouter.get("/export", (req, res) => {
     res.json({ message: "api working" })
 })
 
-settingsRouter.get("/system-stats", (req, res) => {
-    res.json({ message: "api working" })
-})
+settingsRouter.get("/system-stats", getSystemStats)
 
 settingsRouter.post("/clear-cache", (req, res) => {
     res.json({ message: "api working" })

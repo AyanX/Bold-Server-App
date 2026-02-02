@@ -35,30 +35,50 @@ const sensitiveFields = [
 //removing sensitive fields from user object
 const safeUser = (user) => {
   const safeUserDetails = Object.fromEntries(
-  Object.entries(user).filter(
-    ([key]) => !sensitiveFields.includes(key)
-  )
-);
-return safeUserDetails;
-}
+    Object.entries(user).filter(([key]) => !sensitiveFields.includes(key)),
+  );
+  return safeUserDetails;
+};
 
 //get user info from request cookie  ,, req.user set by cookie parser middleware
-const getUser = (req,res)=>{
+const getUser = (req, res) => {
   console.log("User extracted from request:", req.user);
-    if (!req.user || !req.user.email) {
-        throw new Error("Unauthorized");
+  if (!req.user || !req.user.email) {
+    throw new Error("Unauthorized");
+  }
+
+  return {
+    email: req.user.email,
+    name: req.user.name,
+    role: req.user.role,
+    id: req.user.id,
+  };
+};
+
+const isLocalhost = (ip) =>
+  ip === "::1" || ip === "127.0.0.1" || ip === "::ffff:127.0.0.1";
+
+const getClientIp = (req) => {
+  try {
+    const ip =
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress;
+
+    if (isLocalhost(ip)) {
+      return "8.8.8.8"; // Google DNS (test IP)
     }
-    
 
-    return {
-      email: req.user.email,
-      name: req.user.name,
-      role: req.user.role,
-      id: req.user.id
-    }
-}
+    return ip;
+  } catch (e) {
+    throw new Error("Unable to determine client IP");
+  }
+};
 
-
-
-
-module.exports = {safeUser, getMySQLDateTime, uploadImageHelper, sensitiveFields, getUser };
+module.exports = {
+  safeUser,
+  getMySQLDateTime,
+  uploadImageHelper,
+  sensitiveFields,
+  getUser,
+  getClientIp,
+};

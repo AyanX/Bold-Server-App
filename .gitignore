@@ -3,3 +3,10 @@ node_modules
 public
 /public
 ./public
+migrationToJS
+/migrationToJS
+/migrations
+/Frontend/build
+/build
+/Frontend
+Frontend

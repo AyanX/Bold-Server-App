@@ -1,5 +1,13 @@
 # Laravel to Node.js Express Migration Guide
 
+
+Frontend: The AuthContext provides hasRole() functionality, but it's not currently used to conditionally render UI elements or restrict navigation
+
+
+
+
+
+
 ## Overview
 This folder contains comprehensive documentation for migrating your Laravel PHP backend to Node.js with Express.js. Each file covers specific aspects of the application.
 

@@ -1,7 +1,14 @@
 // api/settings
 const db = require("../../db/db");
-const { settings, users } = require("../../drizzle/schema");
-const { eq } = require("drizzle-orm");
+const {
+  settings,
+  users,
+  articles,
+  pageViews,
+  campaigns,
+  categories,
+} = require("../../drizzle/schema");
+const { eq, count, sql } = require("drizzle-orm");
 const { getMySQLDateTime, getUser } = require("../utils");
 const { hashPassword, comparePassword } = require("../../utils/bcrypt/bcrypt");
 
@@ -84,21 +91,28 @@ const passwordUpdate = async (req, res) => {
   const { email } = getUser(req, res);
   const { current_password, password, password_confirmation } = req.body;
 
- try {
+  //   example request body
+  //   {
+  //     "password":"robotic123",
+  //     "current_password":"newrobotic123",
+  //     "password_confirmation":"robotic123"
+  //   }
+
+  try {
     // Fetch user by email
     const userFound = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email));
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
     //if user not found return 404
-  if (userFound.length === 0) {
-    return res.status(404).json({
-      message: "User not found",
-      status: 404,
-    });
-  }
+    if (userFound.length === 0) {
+      return res.status(404).json({
+        message: "User not found",
+        status: 404,
+      });
+    }
     const user = userFound[0];
-  
+
     // Check if current password matches
     const isMatch = await comparePassword(current_password, user.password);
     if (!isMatch) {
@@ -107,7 +121,7 @@ const passwordUpdate = async (req, res) => {
         message: "Current password is incorrect",
       });
     }
-  
+
     // Check if new password and confirmation match
     if (password !== password_confirmation) {
       return res.status(400).json({
@@ -115,36 +129,108 @@ const passwordUpdate = async (req, res) => {
         message: "Password confirmation does not match",
       });
     }
-  
+
     // Hash the new password
     const hashedPassword = await hashPassword(password);
-  
+
     // Update user's password in the database
     await db
       .update(users)
       .set({ password: hashedPassword, updatedAt: getMySQLDateTime() })
       .where(eq(users.email, email));
-  
+
     return res.status(200).json({
       status: 200,
       message: "Password updated successfully",
     });
-
- } catch (error) {
+  } catch (error) {
     console.error("Error updating password:", error);
     return res.status(500).json({
       status: 500,
       message: "Internal server error",
       error: error.message,
     });
- }
-
-
-
+  }
 };
+
+async function getSystemStats(req, res) {
+  try {
+    // Count records from each table
+    const [totalArticles] = await db.select({ count: count() }).from(articles);
+    const [totalUsers] = await db.select({ count: count() }).from(users);
+    const [totalPageViews] = await db
+      .select({ count: count() })
+      .from(pageViews);
+    const [totalCampaigns] = await db
+      .select({ count: count() })
+      .from(campaigns);
+    const [totalCategories] = await db
+      .select({ count: count() })
+      .from(categories);
+
+    const settingsDB = await db.select().from(settings);
+
+    const timezoneSetting = settingsDB.find((s) => s.key === "timezone");
+
+    //find database size in MB
+    const dbName = process.env.DB_NAME;
+
+    const result = await db.execute(sql`
+  SELECT 
+    table_schema AS database_name,
+    ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb
+  FROM information_schema.tables
+  WHERE table_schema = ${dbName}
+  GROUP BY table_schema
+`);
+    const database_size =
+      result[0][0] && result[0][0].size_mb ? `${result[0][0].size_mb} MB` : "Null";
+
+    // For last_backup, since it's not in the schema
+    const lastBackup = "2026-01-26T06:00:00Z";
+
+    const data = {
+      total_articles: totalArticles.count,
+      total_users: totalUsers.count,
+      total_page_views: totalPageViews.count,
+      total_campaigns: totalCampaigns.count,
+      database: {
+        articles: totalArticles.count,
+        users: totalUsers.count,
+        page_views: totalPageViews.count,
+        campaigns: totalCampaigns.count,
+        categories: totalCategories.count,
+      },
+      system: {
+        database_size,
+        node_version: process.version,
+        server_uptime: process.uptime(),
+        express_version: require("express/package.json").version,
+        timezone: timezoneSetting ? timezoneSetting.value : "UTC",
+      },
+      storage: {
+        database_size,
+      },
+      last_backup: lastBackup,
+    };
+
+    return res.status(200).json({
+      data,
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error fetching system stats:", error);
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+}
 
 module.exports = {
   getSettings,
+  getSystemStats,
   putSettings,
   passwordUpdate,
 };
