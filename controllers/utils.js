@@ -42,7 +42,6 @@ const safeUser = (user) => {
 
 //get user info from request cookie  ,, req.user set by cookie parser middleware
 const getUser = (req, res) => {
-  console.log("User extracted from request:", req.user);
   if (!req.user || !req.user.email) {
     throw new Error("Unauthorized");
   }
@@ -65,7 +64,9 @@ const getClientIp = (req) => {
       req.socket.remoteAddress;
 
     if (isLocalhost(ip)) {
-      return "8.8.8.8"; // Google DNS (test IP)
+      //generate a random IP for localhost requests
+       const randomIp = Array.from({ length: 4 }, () => Math.floor(Math.random() * 256)).join(".");
+      return randomIp;
     }
 
     return ip;

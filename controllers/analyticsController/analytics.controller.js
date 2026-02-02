@@ -1,51 +1,43 @@
 //  /api/analytics
-const {pageViews} = require("../../drizzle/schema");
+const { pageViews } = require("../../drizzle/schema");
 const db = require("../../db/db");
-
+const {AnalyticsService }= require("./analytics.helper");
 const { getClientIp, getMySQLDateTime } = require("../utils");
 
-const cache = new Map();
+const redis = require  ('../../utils/redis.client');
+
+const CACHE_TTL = 60 * 60 * 24; // 24 hours caching for IP data
 
 const postAnalyticsData = async (req, res) => {
   try {
     const ip = getClientIp(req);
 
-    //check the ip in cache
-    if (cache.has(ip)) {
-        console.log("Cache hit for IP:", ip);
-       return res.json(cache.get(ip));
+    let data;
+
+    // check redis cache
+    const cachedData = await redis.get(ip);
+
+    if (cachedData) {
+      data = JSON.parse(cachedData);
+      console.log('Redis cache HIT for IP:', ip);
+    } else {
+      console.log('Redis cache MISS → calling ipapi');
+
+      const response = await fetch(`https://ipapi.co/${ip}/json/`);
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      data = await response.json();
+
+      //Save to Redis with TTL
+      await redis.setEx(ip, CACHE_TTL, JSON.stringify(data));
     }
 
-    const response = await fetch(`https://ipapi.co/${ip}/json/`);
-    const data = await response.json();
-
     const dateNow = getMySQLDateTime();
-    // data = ({
-    //   ip,
-    //   city: 
-    //   region: 
-    //   country: 
-    //   country_code: 
-    //   latitude:
-    //   longitude:
-    //   timezone: 
-    //   org :=>    isp: 
-    //   currency: 
-    // });
 
-// req body
-//  {
-//   session_id: 'sess_1769860310258_l7kg460pydp',
-//   page_url: 'http://localhost:3000/#/category/latest',
-//   page_title: 'The Bold East Africa | Intelligence for the Modern Leader',
-//   referrer: 'http://localhost:3000/',
-//   device_type: 'desktop',
-//   browser: 'Chrome',
-//   os: 'Linux',
-//   screen_width: 1536
-// }
-
-   const pageViewData = {
+    const pageViewData = {
       sessionId: req.body.session_id,
       pageUrl: req.body.page_url,
       pageTitle: req.body.page_title,
@@ -62,29 +54,81 @@ const postAnalyticsData = async (req, res) => {
       latitude: data.latitude,
       longitude: data.longitude,
       timezone: data.timezone,
-      timeOnPage:0,
+      timeOnPage: 0,
       createdAt: dateNow,
       updatedAt: dateNow,
-    }
+    };
 
-     await db.insert(pageViews).values(pageViewData);
+    await db.insert(pageViews).values(pageViewData);
 
+    console.log(
+      ` ${pageViewData.country} → ${pageViewData.pageUrl}`
+    );
 
-    // cache the response for future use
+    return res.status(200).json({
+      message: 'Location data fetched successfully',
+      data: pageViewData,
+    });
 
-    cache.set(ip, data);
-
-    console.log("Page view data stored:", pageViewData);
-
-    return res
-      .status(200)
-      .json({ message: "Location data fetched successfully", data: pageViewData });
   } catch (error) {
-    console.error("Error fetching location data:", error);
-    return res.status(500).json({ message: "Failed to fetch location data" });
+    console.error('Error fetching location data:', error);
+    return res.status(500).json({ message: 'Failed to fetch location data' });
   }
 };
 
+
+const getDashboardStats =async  (req,res)=>{
+     try {
+    const [
+      stats,
+      audienceGrowth,
+      dailyPageViews,
+      monthlyPageViews,
+      deviceBreakdown,
+      topLocations,
+      kenyaCounties,
+      articlesByCategory,
+      usersByRole,
+      liveTraffic,
+    ] = await Promise.all([
+      AnalyticsService.getDashboardStats(),
+      AnalyticsService.getAudienceGrowth(),
+      AnalyticsService.getDailyPageViews(),
+      AnalyticsService.getMonthlyPageViews(),
+      AnalyticsService.getDeviceBreakdown(),
+      AnalyticsService.getTopLocations(),
+      AnalyticsService.getKenyaCounties(),
+      AnalyticsService.getArticlesByCategory(),
+      AnalyticsService.getUsersByRole(),
+      AnalyticsService.getLiveTraffic(),
+    ]);
+
+    res.json({
+      data: {
+        stats,
+        audienceGrowth,
+        dailyPageViews,
+        monthlyPageViews,
+        deviceBreakdown,
+        topLocations,
+        kenyaCounties,
+        articlesByCategory,
+        usersByRole,
+        liveTraffic,
+      },
+      status: 200,
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.status(500).json({
+      message: 'Failed to fetch dashboard data',
+      status: 500,
+    });
+  }
+}
+
+
 module.exports = {
   postAnalyticsData,
-}
+  getDashboardStats,
+};

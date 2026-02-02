@@ -20,8 +20,6 @@ const cookieParserMiddleware = (req, res, next) => {
  //     name:xyz
 // }
 
-
-
    return next();
   } catch (error) {
     console.error("Cookie parsing error:", error.message);
