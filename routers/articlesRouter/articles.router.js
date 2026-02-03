@@ -1,7 +1,7 @@
 const express = require("express");
 const {
   getAllArticles,
-  getArticleById,
+  getArticleByIdOrSlug,
   addNewArticle,
   updateArticleById,
   deleteArticleById,
@@ -17,11 +17,13 @@ articlesRouter.get("/", getAllArticles);
 
 articlesRouter.post("/", addNewArticle);
 
-articlesRouter.get("/:id", getArticleById);
+articlesRouter.get("/:identifier", getArticleByIdOrSlug);
 
 articlesRouter.put("/:id", updateArticleById);
 
 articlesRouter.delete("/:id", deleteArticleById);
+
+
 articlesRouter.post("/:id/view", trackView);
 
 articlesRouter.post("/:id/click", trackClick);

@@ -56,6 +56,7 @@ const addNewArticle = async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    console.log("Adding new article :", req.body);
 
   const {
     categories,
@@ -132,15 +133,26 @@ const addNewArticle = async (req, res) => {
   }
 };
 
-const getArticleById = async (req, res) => {
+const getArticleByIdOrSlug = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { identifier } = req.params;
 
-    const article = await db
-      .select()
-      .from(articles)
-      .where(eq(articles.id, Number(id)))
-      .limit(1);
+    let article;
+    if (isNaN(identifier)) {
+      // It's a slug
+      article = await db
+        .select()
+        .from(articles)
+        .where(eq(articles.slug, identifier))
+        .limit(1);
+    } else {
+      // It's an ID
+      article = await db
+        .select()
+        .from(articles)
+        .where(eq(articles.id, Number(identifier)))
+        .limit(1);
+    }
 
     if (!article.length) {
       return res.status(404).json({ error: "Article not found" });
@@ -303,8 +315,56 @@ const getArticlesByCategory = async (req, res) => {
   }
 };
 
-const deleteArticleById = (req, res) => {
-  res.json({ message: "api working" });
+const deleteArticleById = async (req, res) => {
+  const { id } = req.params;
+
+  if(!req.user.email){
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+ await db.delete(articles)
+    .where(eq(articles.id, Number(id)))
+    .then(async (result) => {
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Article not found" });
+      }
+
+      // Update user article counts
+      if (req.user && req.user.email) {
+        const userAuthor = await db.select().from(users).where(eq(users.email, req.user.email));
+        const total = userAuthor[0].total_articles;
+        let published = userAuthor[0].articles_published;
+
+        // Assuming we need to check if the deleted article was published
+        const deletedArticle = await db
+          .select()
+          .from(articles)
+          .where(eq(articles.id, Number(id)))
+          .limit(1);
+
+        if (deletedArticle.length && deletedArticle[0].status === "Published") {
+          if(published > 0){
+            published -= 1;
+          }else{
+            published =0
+          }
+        }
+        //update user counts for articles
+        await db
+          .update(users)
+          .set({
+            total_articles: total > 0 ? total - 1 : 0,
+            articles_published: published,
+          })
+          .where(eq(users.email, req.user.email));
+      }
+
+      res.status(200).json({ message: "Article deleted successfully" });
+    })
+    .catch((error) => {
+      console.error("Error deleting article:", error);
+      res.status(500).json({ error: "Internal server error" });
+    });
 };
 
 const trackView = async (req, res) => {
@@ -360,12 +420,10 @@ const trackClick = async (req, res) => {
 module.exports = {
   addNewArticle,
   getAllArticles,
-  getArticleById,
+  getArticleByIdOrSlug,
   updateArticleById,
   deleteArticleById,
   getArticlesByCategory,
   trackView,
   trackClick,
 };
-
-
