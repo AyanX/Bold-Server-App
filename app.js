@@ -12,6 +12,8 @@ const authRouter = require("./routers/authRouter/auth.router");
 const analyticsRouter = require("./routers/analyticsRouter/analytics.router");
 const cookieParser = require("cookie-parser");
 const cookieParserMiddleware = require("./utils/middleware/cookieParser");
+const requestIp = require('request-ip')
+
 
 const app = express();
 
@@ -25,6 +27,11 @@ app.use(
     credentials: true,
   }),
 );
+
+app.set('trust proxy', true);
+
+//set a users ip in req.clientIp
+app.use(requestIp.mw());
 
 app.use(cookieParser());
 

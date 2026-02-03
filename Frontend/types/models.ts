@@ -58,6 +58,8 @@ export enum UserStatus {
 export interface Article {
   /** Unique identifier */
   id: string;
+  /** URL-friendly slug */
+  slug: string;
   /** Article title */
   title: string;
   /** Short excerpt/summary */
@@ -92,6 +94,8 @@ export interface Article {
   views?: number;
   /** Click count */
   clicks?: number;
+ /**Author profile image */
+  authorImage?: string;
 }
 
 /**

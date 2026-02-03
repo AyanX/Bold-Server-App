@@ -59,9 +59,7 @@ const isLocalhost = (ip) =>
 
 const getClientIp = (req) => {
   try {
-    const ip =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.socket.remoteAddress;
+    const ip = req.clientIp
 
     // if (isLocalhost(ip)) {
     //   //generate a random IP for localhost requests
@@ -75,6 +73,16 @@ const getClientIp = (req) => {
   }
 };
 
+
+const createSlug = (title) => {
+  return (title || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
 module.exports = {
   safeUser,
   getMySQLDateTime,
@@ -82,4 +90,5 @@ module.exports = {
   sensitiveFields,
   getUser,
   getClientIp,
+  createSlug,
 };

@@ -49,9 +49,9 @@ const getAllUsers = async (req, res) => {
  */
 const createUser = async (req, res) => {
   console.log("Creating user with data:", req.body);
+  //invited users handled here
   try {
-    const { name, email, password, role, bio, image, department, phone, status } =
-      req.body;
+    const { name, email, linkedin, role, bio, image} = req.body;
 
     // Validate required fields
     if (!name || name.trim().length === 0) {
@@ -87,6 +87,7 @@ const createUser = async (req, res) => {
       .where(eq(users.email, email.toLowerCase()))
       .limit(1);
 
+      //email exists => return
     if (existingUser.length > 0) {
       return res.status(422).json({
         message: "Validation failed",
@@ -95,32 +96,17 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Validate optional password if provided
-    let hashedPassword = null;
-    if (password && password.trim().length > 0) {
-      if (password.length < 8) {
-        return res.status(422).json({
-          message: "Validation failed",
-          status: 422,
-          errors: { password: ["The password must be at least 8 characters."] },
-        });
-      }
-      hashedPassword = hashPassword(password);
-    }
-
     // Insert new user
     const now = getMySQLDateTime();
 
     await db.insert(users).values({
       name: name.trim(),
       email: email.toLowerCase(),
-      password: hashedPassword || null,
       role: role || "Contributor",
-      status: status || "Active",
+      status: "Pending",
       bio: bio || null,
       image: image || null,
-      department: department || null,
-      phone: phone || null,
+      linkedin:linkedin|| null,
       created_at: now,
       updated_at: now,
     });

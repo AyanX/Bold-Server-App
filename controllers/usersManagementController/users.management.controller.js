@@ -181,13 +181,14 @@ const acceptInvitation = async (req, res) => {
     const { email, otp, password, confirmPassword } = req.body;
 
     // Validation
-    if (!email || !otp || !password) {
+    if (!email || !otp || !password || !confirmPassword) {
       return res.status(400).json({
         status: 400,
         message: "Missing required fields: email, otp, password, name",
       });
     }
 
+    //
     if (password !== confirmPassword) {
       return res.status(400).json({
         status: 400,
@@ -195,13 +196,14 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // Find invitation
+    // Find invitation if it exists
     const invitation = await db
       .select()
       .from(userInvitations)
       .where(eq(userInvitations.email, email.toLowerCase().trim()))
       .limit(1);
 
+      // if invitation was not found return
     if (invitation.length === 0) {
       return res.status(404).json({
         status: 404,
@@ -219,7 +221,7 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // Check if expired
+    // Check if otp is expired
     if (new Date(invitationRecord.otpExpiresAt) < new Date()) {
       return res.status(410).json({
         status: 410,
@@ -227,7 +229,7 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // Verify OTP
+    // Verify OTP which has been hashed and stored in db
     const isOTPValid = await comparePassword(otp, invitationRecord.otpHash);
     if (!isOTPValid) {
       return res.status(401).json({
@@ -246,7 +248,7 @@ const acceptInvitation = async (req, res) => {
       .update(users)
       .set({
         password: hashedPassword,
-        status: "Active",
+        status: "Inactive",
         updated_at: now,
         invitation_accepted_at: now,
         email_verified_at: now,
@@ -267,7 +269,7 @@ const acceptInvitation = async (req, res) => {
       })
       .where(eq(userInvitations.id, invitationRecord.id));
 
-    console.log(`✅ User ${email} accepted invitation and created account`);
+    console.log(`User ${email} accepted invitation and created account`);
 
     return res.status(201).json({
       status: 201,
@@ -279,7 +281,7 @@ const acceptInvitation = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error accepting invitation:", error);
+    console.error(" Error accepting invitation:", error);
     return res.status(500).json({
       status: 500,
       message: "Internal server error",
@@ -307,7 +309,7 @@ const getInvitationsList = async (req, res) => {
 
     const invitations = await query;
 
-    console.log(`📋 Fetched ${invitations.length} invitations`);
+    console.log(`Fetched ${invitations.length} invitations`);
 
     return res.status(200).json({
       status: 200,
@@ -315,7 +317,7 @@ const getInvitationsList = async (req, res) => {
       data: invitations,
     });
   } catch (error) {
-    console.error("❌ Error fetching invitations:", error);
+    console.error(" Error fetching invitations:", error);
     return res.status(500).json({
       status: 500,
       message: "Internal server error",

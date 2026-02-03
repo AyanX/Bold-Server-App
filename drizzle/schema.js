@@ -71,6 +71,7 @@ const articles = mysqlTable(
       .defaultNow()
       .onUpdateNow()
       .notNull(),
+      author_image: varchar("author_image", { length: 255 }),
   },
   (table) => [unique("articles_slug_unique").on(table.slug)],
 );

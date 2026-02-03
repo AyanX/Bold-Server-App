@@ -6,7 +6,7 @@ List all users with optional filters and article statistics.
 
 ### Request Headers
 ```
-Authorization: Bearer <token>        // Required
+Authorization: Bearer <token>     // Required
 Accept: application/json
 ```
 
@@ -14,19 +14,21 @@ Accept: application/json
 
 **Type Definition:**
 ```typescript
+
 interface GetUsersQuery {
   search?: string;      // Optional: Search by name, email, or department
   role?: "Admin" | "Editor" | "Contributor" | "Viewer";
   status?: "Active" | "Inactive" | "Suspended";
 }
-```
 
+```
 **Example:**
 ```
 GET /api/users?search=john&role=Admin&status=Active
 ```
 
 ### Response (200 OK)
+
 
 **Type Definition:**
 ```typescript
@@ -41,23 +43,24 @@ interface UserWithStats {
   bio: string | null;
   image: string | null;
   linkedin: string | null;
-  last_active: string | null;           // ISO 8601
+  last_active: string | null;      
   login_count: number;
-  last_login_at: string | null;         // ISO 8601
+  last_login_at: string | null;         
   last_login_ip: string | null;
   article_count: number;
   published_count: number;
   draft_count: number;
   total_views: number;
   avg_seo_score: number;
-  created_at: string;                   // ISO 8601
-  updated_at: string;                   // ISO 8601
+  created_at: string;                  
+  updated_at: string;            
 }
 
 interface GetUsersResponse {
   data: UserWithStats[];
   status: 200;
 }
+
 ```
 
 **JSON Example:**

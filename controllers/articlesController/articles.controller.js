@@ -1,49 +1,47 @@
 const { articles, users } = require("../../drizzle/schema");
 const db = require("../../db/db");
-const { desc, eq, sql, and } = require("drizzle-orm");
-const { json } = require("drizzle-orm/gel-core");
+const { eq, sql, and } = require("drizzle-orm");
 
+const { createSlug } = require("../utils");
 
-   function mapArticle(article) {
-      return {
-        id: String(article.id),
-        title: article.title,
-        slug: article.slug,
-        excerpt: article.excerpt ?? "",
-        image: article.image,
-        category: article.category,
-        categories: JSON.parse(article.categories || "[]"),
-        author: article.author ?? "",
-        date: article.created_at,
-        readTime: article.read_time ?? "5 min read",
-        isPrime: Boolean(article.is_prime),
-        isHeadline: Boolean(article.is_headline),
-        status: article.status ?? "Draft",
-        metaTags: JSON.parse(article.meta_tags || "[]"),
-        metaDescription: article.meta_description ?? "",
-        seoScore: article.seo_score ?? 0,
-        views: article.views ?? 0,
-        clicks: article.clicks ?? 0,
-        content: article.content ?? "",
-        created_at: article.created_at,
-        updated_at: article.updated_at,
-      };
-    }
+function mapArticle(article) {
+  return {
+    id: String(article.id),
+    title: article.title,
+    slug: article.slug,
+    excerpt: article.excerpt ?? "",
+    image: article.image,
+    category: article.category,
+    categories: JSON.parse(article.categories || "[]"),
+    author: article.author ?? "",
+    date: article.created_at,
+    readTime: article.read_time ?? "5 min read",
+    isPrime: Boolean(article.is_prime),
+    isHeadline: Boolean(article.is_headline),
+    status: article.status ?? "Draft",
+    metaTags: JSON.parse(article.meta_tags || "[]"),
+    metaDescription: article.meta_description ?? "",
+    seoScore: article.seo_score ?? 0,
+    views: article.views ?? 0,
+    clicks: article.clicks ?? 0,
+    content: article.content ?? "",
+    created_at: article.created_at,
+    updated_at: article.updated_at,
+    authorImage: article.author_image || null,
+  };
+}
 
- const getAllArticles = async (req, res) => {
+const getAllArticles = async (req, res) => {
   try {
-    const allArticles = await db
-      .select()
-      .from(articles)
+    const allArticles = await db.select().from(articles);
 
     const mappedArticles = allArticles.map((article) => mapArticle(article));
 
     return res.status(200).json({
-      "data": mappedArticles,
-      "status": 200,
-      "message": "Articles fetched successfully",
+      data: mappedArticles,
+      status: 200,
+      message: "Articles fetched successfully",
     });
-  
   } catch (err) {
     console.log("Error fetching articles:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -51,16 +49,12 @@ const { json } = require("drizzle-orm/gel-core");
 };
 
 const addNewArticle = async (req, res) => {
-  //if categories or tags are arrays, turn them into json objects
-    if(!req.user.email){
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    console.log("Adding new article :", req.body);
+  if (!req.user.email) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   const {
     categories,
-    tags,
     title,
     slug,
     excerpt,
@@ -73,18 +67,26 @@ const addNewArticle = async (req, res) => {
     content,
     is_headline,
     seo_score,
-    metaTags,
   } = req.body;
 
   try {
-    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    
+    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+
     // Validate and format categories (MySQL SET requires array or comma-separated string)
     let categoriesValue = [];
     if (categories && Array.isArray(categories)) {
       categoriesValue = categories;
     }
-    
+
+    //find the image of the author and attach it to the article
+
+    const authorUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, req.user.email))
+      .limit(1);
+
+    //if categories or tags are arrays, turn them into json objects
     await db.insert(articles).values({
       categories: JSON.stringify(categoriesValue),
       title,
@@ -101,15 +103,29 @@ const addNewArticle = async (req, res) => {
       seo_score,
       created_at: now,
       updated_at: now,
+      author_image: authorUser.length ? authorUser[0].image : null,
     });
 
     // Update user article counts
-    if (req.user && req.user.name) {
+    if (req.user && req.user.email) {
       await db
         .update(users)
         .set({
           total_articles: sql`${users.total_articles} + 1`,
-          articles_published: (status || "Published") === "Published" ? sql`${users.articles_published} + 1` : sql`${users.articles_published}`,
+          articles_published:
+            (status || "Published") === "Published"
+              ? sql`${users.articles_published} + 1`
+              : sql`${users.articles_published}`,
+          //draft articles
+          articles_drafted:
+            status === "Draft"
+              ? sql`${users.articles_drafted} + 1`
+              : sql`${users.articles_drafted}`,
+          //pending articles
+          articles_pending:
+            status === "Pending"
+              ? sql`${users.articles_pending} + 1`
+              : sql`${users.articles_pending}`,
         })
         .where(eq(users.email, req.user.email));
     }
@@ -121,7 +137,6 @@ const addNewArticle = async (req, res) => {
       .limit(1);
 
     latestArticle = latestArticle[0];
-   console.log("Article added")
     return res.status(201).json({
       data: latestArticle,
       message: "Article added successfully",
@@ -137,13 +152,16 @@ const getArticleByIdOrSlug = async (req, res) => {
   try {
     const { identifier } = req.params;
 
+    //the identifier can be either id or slug
+
     let article;
     if (isNaN(identifier)) {
-      // It's a slug
+      // It's a slug title,  check it vs slug titles
+
       article = await db
         .select()
         .from(articles)
-        .where(eq(articles.slug, identifier))
+        .where(eq(createSlug(articles.title), identifier))
         .limit(1);
     } else {
       // It's an ID
@@ -172,13 +190,13 @@ const getArticleByIdOrSlug = async (req, res) => {
 const updateArticleById = async (req, res) => {
   const { id } = req.params;
 
-  if(!req.user.email){
+  //validate user exists
+  if (!req.user.email) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   const {
     categories,
-    tags,
     title,
     slug,
     excerpt,
@@ -191,11 +209,10 @@ const updateArticleById = async (req, res) => {
     content,
     is_headline,
     seo_score,
-    metaTags,
   } = req.body;
 
   try {
-    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
 
     // Validate and format categories
     let categoriesValue = [];
@@ -250,29 +267,43 @@ const updateArticleById = async (req, res) => {
 
     // Update user article counts
     if (req.user && req.user.email) {
-      const userAuthor = await db.select().from(users).where(eq(users.email, req.user.email));
+      const userAuthor = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, req.user.email));
       const total = userAuthor[0].total_articles;
       let published = userAuthor[0].articles_published;
+      let drafted = userAuthor[0].articles_drafted;
+      let pending = userAuthor[0].articles_pending;
 
-      // Check if status changed by the incoming update and fethed article
-      // If changing from non-published to published
-      if (existingArticle[0].status !== "Published" && status === "Published") {
+      const oldStatus = existingArticle[0].status;
+      const newStatus = status || "Published";
+
+      // Decrement the old status count
+      if (oldStatus === "Published" && published > 0) {
+        published -= 1;
+      } else if (oldStatus === "Draft" && drafted > 0) {
+        drafted -= 1;
+      } else if (oldStatus === "Pending" && pending > 0) {
+        pending -= 1;
+      }
+
+      // Increment the new status count
+      if (newStatus === "Published") {
         published += 1;
+      } else if (newStatus === "Draft") {
+        drafted += 1;
+      } else if (newStatus === "Pending") {
+        pending += 1;
       }
 
-      // If changing from published to non-published
-      if (existingArticle[0].status === "Published" && status !== "Published") {
-        if(published > 0){
-          published -= 1;
-        }else{
-          published =0
-        }
-      }
       await db
         .update(users)
         .set({
           total_articles: total,
           articles_published: published,
+          articles_drafted: drafted,
+          articles_pending: pending,
         })
         .where(eq(users.email, req.user.email));
     }
@@ -295,20 +326,22 @@ const getArticlesByCategory = async (req, res) => {
     const categoryArticles = await db
       .select()
       .from(articles)
-      .where(and(
-        eq(articles.status, "Published"),
-        sql`LOWER(${articles.category}) = ${category.toLowerCase()}`
-      ));
+      .where(
+        and(
+          eq(articles.status, "Published"),
+          sql`LOWER(${articles.category}) = ${category.toLowerCase()}`,
+        ),
+      );
 
-
-    const mappedArticles = categoryArticles.map((article) => mapArticle(article));
+    const mappedArticles = categoryArticles.map((article) =>
+      mapArticle(article),
+    );
 
     return res.status(200).json({
-      "data": mappedArticles,
-      "status": 200,
-      "message": `Articles for category ${category} fetched successfully`,
+      data: mappedArticles,
+      status: 200,
+      message: `Articles for category ${category} fetched successfully`,
     });
-  
   } catch (err) {
     console.log("Error fetching articles by category:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -318,11 +351,12 @@ const getArticlesByCategory = async (req, res) => {
 const deleteArticleById = async (req, res) => {
   const { id } = req.params;
 
-  if(!req.user.email){
+  if (!req.user.email) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
- await db.delete(articles)
+  await db
+    .delete(articles)
     .where(eq(articles.id, Number(id)))
     .then(async (result) => {
       if (result.rowCount === 0) {
@@ -331,7 +365,10 @@ const deleteArticleById = async (req, res) => {
 
       // Update user article counts
       if (req.user && req.user.email) {
-        const userAuthor = await db.select().from(users).where(eq(users.email, req.user.email));
+        const userAuthor = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, req.user.email));
         const total = userAuthor[0].total_articles;
         let published = userAuthor[0].articles_published;
 
@@ -343,10 +380,10 @@ const deleteArticleById = async (req, res) => {
           .limit(1);
 
         if (deletedArticle.length && deletedArticle[0].status === "Published") {
-          if(published > 0){
+          if (published > 0) {
             published -= 1;
-          }else{
-            published =0
+          } else {
+            published = 0;
           }
         }
         //update user counts for articles

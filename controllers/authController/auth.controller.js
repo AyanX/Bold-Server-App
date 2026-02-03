@@ -3,47 +3,49 @@ const { eq } = require("drizzle-orm");
 const db = require("../../db/db");
 const { users } = require("../../drizzle/schema");
 const { generateToken } = require("../../utils/jwt/jwt");
+const { getClientIp } = require("request-ip");
 
 const isoDate = require("../../controllers/utils").getMySQLDateTime();
 
 const fakeLogin = async (req, res) => {
-        const token = generateToken({
-      id: 5,
+  const token = generateToken({
+    id: 5,
+    role: "Admin",
+    email: "xhadyayan@gmail.com",
+    name: "xyz",
+  });
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    sameSite: "Lax", // Same-origin now
+    secure: false, // localhost
+    path: "/",
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+  });
+
+  return res.json({
+    data: {
+      id: 1,
+      name: "John Doe",
+      email: "user@example.com",
       role: "Admin",
-      email: "xhadyayan@gmail.com",
-      name: "xyz",
-    });
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: "Lax", // Same-origin now
-      secure: false, // localhost
-      path: "/",
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
-
-return res.json({
-  "data": {
-    "id": 1,
-    "name": "John Doe",
-    "email": "user@example.com",
-    "role": "Admin",
-    "status": "Active",
-    "department": "Engineering",
-    "phone": "+254712345678",
-    "bio": "Sample bio",
-    "image": "https://cdn.example.com/storage/users/user_1674816600_abc12345.jpg",
-    "linkedin": "linkedin.com/in/johndoe",
-    "last_login_at": "2026-01-26T10:30:00Z",
-    "last_login_ip": "192.168.1.1",
-    "login_count": 5,
-    "created_at": "2026-01-01T10:00:00Z",
-    "updated_at": "2026-01-26T10:30:00Z"
-  },
-  "message": "Login successful",
-  "status": 200
-}); 
-}
+      status: "Active",
+      department: "Engineering",
+      phone: "+254712345678",
+      bio: "Sample bio",
+      image:
+        "https://cdn.example.com/storage/users/user_1674816600_abc12345.jpg",
+      linkedin: "linkedin.com/in/johndoe",
+      last_login_at: "2026-01-26T10:30:00Z",
+      last_login_ip: "192.168.1.1",
+      login_count: 5,
+      created_at: "2026-01-01T10:00:00Z",
+      updated_at: "2026-01-26T10:30:00Z",
+    },
+    message: "Login successful",
+    status: 200,
+  });
+};
 
 const signup = async (req, res) => {
   try {
@@ -104,7 +106,6 @@ const signup = async (req, res) => {
 };
 
 const login = async (req, res) => {
-
   // fakeLogin(req,res);
   // return;
 
@@ -124,33 +125,37 @@ const login = async (req, res) => {
       .where(eq(users.email, email.toLowerCase()))
       .limit(1);
 
+      // if user not found return
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Check if user is active
-    if (user.status !== "Active") {
+    // Check if user is not suspended or pending
+    if (user.status === "Suspended" || user.status === "Pending") {
       return res.status(403).json({ message: "Account is not active" });
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    // return for invalid passwords
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Update login info
     const now = new Date().toISOString();
+    
     await db
       .update(users)
       .set({
-        last_login_at: isoDate,
-        last_login_ip: req.ip || req.connection.remoteAddress,
+        last_login_at:  now,
+        last_login_ip: getClientIp(req),
+        status: "Active",
         login_count: (user.login_count || 0) + 1,
       })
       .where(eq(users.id, user.id));
 
-    // Return user data without password
+    // user data
     const userData = {
       id: user.id,
       name: user.name,
@@ -169,6 +174,11 @@ const login = async (req, res) => {
       updated_at: user.updated_at,
     };
 
+    //remove sensitive fields before sending user data
+
+    const safeUserData = safeUser(userData);
+
+
     // Generate JWT token
     const token = generateToken({
       id: user.id,
@@ -180,15 +190,15 @@ const login = async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       sameSite: "Lax", // Same-origin now
-      secure: false, // localhost
+      secure: process.env.NODE_ENV === "production", 
       path: "/",
-      maxAge: 1000 * 60 * 60 * 24 * 7,
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     });
 
     return res.status(200).json({
       message: "Login successful",
       status: "ok",
-      data: userData,
+      data: safeUserData,
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -196,4 +206,45 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login, signup };
+const logout = async (req, res) => {
+  const { email } = req.user;
+
+  // if a user is not authenticated
+  if (!email) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const now = isoDate();
+
+  //find the user
+  try {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email.toLowerCase()))
+      .limit(1);
+
+    //update users last_active
+    await db
+      .update(users)
+      .set({
+        last_active: now,
+        status:"Inactive"
+      })
+      .where(eq(users.id, user.id));
+
+    // Clear the token cookie
+
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+    return res.status(200).json({ message: "Logout successful" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports = { login, signup, logout };

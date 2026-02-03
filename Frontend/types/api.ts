@@ -101,8 +101,8 @@ export interface SystemStats {
     database_size: string;
   };
   system: {
-    php_version: string;
-    laravel_version: string;
+    node_version: string;
+    express_version: string;
     timezone: string;
   };
 }

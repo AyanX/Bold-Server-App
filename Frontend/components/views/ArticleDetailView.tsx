@@ -40,9 +40,9 @@ const ArticleDetailView: React.FC = () => {
 
         // If id is a slug (not a number), resolve it to an ID
         if (id && isNaN(Number(id))) {
-          const foundArticle = all.find((a: any) => createSlug(a.title) === id);
+          const foundArticle = all.find((a: any) => createSlug(a.slug) === id);
           if (foundArticle) {
-            targetId = foundArticle.id;
+            targetId = foundArticle.id
           } else {
             console.warn(`Article not found for slug: ${id}`);
             setIsLoading(false);
@@ -150,7 +150,7 @@ const ArticleDetailView: React.FC = () => {
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-y border-gray-100 py-8 mb-12 gap-8">
                 <div className="flex items-center gap-5">
-                  <img src={`https://i.pravatar.cc/100?u=${article.author}`} className="w-16 h-16 rounded-full object-cover grayscale" alt={article.author} />
+                  <img src={article.authorImage || `https://i.pravatar.cc/100?u=${article.author}`} className="w-16 h-16 rounded-full object-cover grayscale" alt={article.author} />
                   <div>
                     <Link to={`/author/${encodeURIComponent(article.author)}`} className="block text-sm font-black uppercase tracking-widest text-black hover:text-[#e5002b] transition-colors">
                       By {article.author}
@@ -270,7 +270,7 @@ const ArticleDetailView: React.FC = () => {
                   ))}
                 </div>
               </div>
-
+              
               <AdSlot type="banner" />
 
               <div>
