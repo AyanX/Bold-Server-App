@@ -122,8 +122,8 @@ const DashboardUsers: React.FC<DashboardUsersProps> = ({
             <tbody className="divide-y divide-gray-100">
               {paginatedUsers.map(user => {
                 const userArticles = articles.filter(a => a.author === user.name);
-                const articleCount = userArticles.length;
-                const publishedCount = userArticles.filter(a => a.status === 'Published').length;
+                const articleCount = user.total_articles || 0;
+                const publishedCount = user.articles_published || 0;
                 const avgSeo = articleCount > 0
                   ? Math.round(userArticles.reduce((acc, curr) => acc + (curr.seo_score || curr.seoScore || 0), 0) / articleCount)
                   : 0;

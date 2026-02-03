@@ -168,6 +168,15 @@ const uploadInviteImage = async (req, res) => {
  * Accept invitation and create user account
  */
 const acceptInvitation = async (req, res) => {
+
+
+  //   {
+  // "email":"xhadyayan@gmail.com",
+  // "otp":"888569",
+  // "confirmPassword":"robotic123",
+  // "password":"robotic123"}
+
+
   try {
     const { email, otp, password, confirmPassword } = req.body;
 

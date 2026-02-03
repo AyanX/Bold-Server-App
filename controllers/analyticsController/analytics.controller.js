@@ -60,11 +60,6 @@ const postAnalyticsData = async (req, res) => {
     };
 
     await db.insert(pageViews).values(pageViewData);
-
-    console.log(
-      ` ${pageViewData.country} → ${pageViewData.pageUrl}`
-    );
-
     return res.status(200).json({
       message: 'Location data fetched successfully',
       data: pageViewData,

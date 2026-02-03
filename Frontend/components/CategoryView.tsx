@@ -30,7 +30,8 @@ export const CategoryView: React.FC = () => {
             // Check if article category matches the current slug
             const catSlug = CATEGORIES.find(c => c.name.toLowerCase() === a.category.toLowerCase())?.slug;
             const articleCategoryNormalized = normalize(a.category);
-            return catSlug === slug || articleCategoryNormalized === slug || articleCategoryNormalized === 'opinion' && slug === 'opinions';
+            const categoriesNormalized = a.categories ? a.categories.map((c: string) => normalize(c)) : [];
+            return catSlug === slug || articleCategoryNormalized === slug || categoriesNormalized.includes(slug) || articleCategoryNormalized === 'opinion' && slug === 'opinions';
         });
 
         setArticles(filtered);

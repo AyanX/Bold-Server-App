@@ -63,11 +63,11 @@ const getClientIp = (req) => {
       req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
       req.socket.remoteAddress;
 
-    if (isLocalhost(ip)) {
-      //generate a random IP for localhost requests
-       const randomIp = Array.from({ length: 4 }, () => Math.floor(Math.random() * 256)).join(".");
-      return randomIp;
-    }
+    // if (isLocalhost(ip)) {
+    //   //generate a random IP for localhost requests
+    //    const randomIp = Array.from({ length: 4 }, () => Math.floor(Math.random() * 256)).join(".");
+    //   return randomIp;
+    // }
 
     return ip;
   } catch (e) {

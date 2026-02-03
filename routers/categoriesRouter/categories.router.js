@@ -6,11 +6,16 @@ const {
   updateCategory,
   deleteCategory,
 } = require('../../controllers/categoriesController/categories.controller');
+const { getArticlesByCategory } = require('../../controllers/articlesController/articles.controller');
 
 const categoriesRouter = express.Router();
 
 // GET all categories with optional search
 categoriesRouter.get("/", getAllCategories);
+
+categoriesRouter.get("/:category", getArticlesByCategory);
+
+categoriesRouter.get("/category/:category", getArticlesByCategory);
 
 // POST create a new category
 categoriesRouter.post("/", createCategory);

@@ -50,12 +50,7 @@ const articles = mysqlTable(
     excerpt: text().notNull(),
     image: longtext(),
     category: varchar({ length: 255 }).notNull(),
-    categories: mysqlSet([
-      "Latest News",
-      "Headline News",
-      "Technology",
-      "Sports",
-    ])("categories"),
+    categories: text("categories"),
     author: varchar({ length: 255 }),
     read_time: varchar("read_time", { length: 255 })
       .default("5 min read")
@@ -63,7 +58,7 @@ const articles = mysqlTable(
     is_prime: tinyint("is_prime").default(0).notNull(),
     is_headline: tinyint("is_headline").default(0).notNull(),
     status: varchar({ length: 255 }).default("Draft").notNull(),
-    meta_tags: mysqlSet(["News", "Updates"])("meta_tags"),
+    meta_tags: text("meta_tags"),
     meta_description: text("meta_description"),
     seo_score: int("seo_score").default(0).notNull(),
     views: bigint({ mode: "number", unsigned: true }).default(0).notNull(),
@@ -299,13 +294,7 @@ const users = mysqlTable(
 
     password: varchar({ length: 255 }),
     two_factor_secret: varchar("two_factor_secret", { length: 255 }),
-    two_factor_recovery_codes: mysqlSet([
-      "code1",
-      "code2",
-      "code3",
-      "code4",
-      "code5",
-    ])("two_factor_recovery_codes"),
+    two_factor_recovery_codes: text("two_factor_recovery_codes"),
     role: userRoleEnum.default("Contributor").notNull(),
     status: userStatusEnum.default("Pending").notNull(),
 
@@ -321,12 +310,15 @@ const users = mysqlTable(
       mode: "string",
     }),
     last_active: timestamp("last_active", { mode: "string" }),
-
     remember_token: varchar("remember_token", { length: 100 }),
-
     created_at: timestamp("created_at", { mode: "string" }),
     updated_at: timestamp("updated_at", { mode: "string" }),
-
+    total_articles: int("total_articles").default(0).notNull(),
+    total_views: bigint({ mode: "number", unsigned: true }).default(0).notNull(),
+    total_clicks: bigint({ mode: "number", unsigned: true }).default(0).notNull(),
+    articles_published: int("articles_published").default(0).notNull(),
+    articles_drafted: int("articles_drafted").default(0).notNull(),
+    articles_pending: int("articles_pending").default(0).notNull(),
     last_login_at: timestamp("last_login_at", { mode: "string" }),
     last_login_ip: varchar("last_login_ip", { length: 45 }),
 

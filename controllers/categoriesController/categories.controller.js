@@ -15,7 +15,6 @@ const getAllCategories = async (req, res) => {
       query = query.where(like(categories.name, `%${search.trim()}%`));
     }
     const allCategories = await query;
-    console.log(`📂 Fetched ${allCategories.length} categories`);
     return res.status(200).json({
       data: allCategories,
       status: 200,
