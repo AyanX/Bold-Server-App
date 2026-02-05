@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../../services/api';
+import useAuth from '@/hooks/useAuth';
 
 interface DashboardAdsProps {
   ads: any[];
@@ -22,6 +23,26 @@ const DashboardAds: React.FC<DashboardAdsProps> = ({ ads, setAds }) => {
     invoice: ''
   });
   const [loading, setLoading] = useState(false);
+
+  const { hasRole } = useAuth();
+  //  Editor, Admin access only
+
+  if (!hasRole(["Admin", "Editor"])) {
+    return (
+      <div className="bg-white border border-gray-100 shadow-sm rounded-sm p-6 text-center">
+        <h3 className="text-lg font-bold text-[#001733]">Access Denied</h3>
+        <p className="text-sm text-gray-500 mt-2">
+          You do not have permission to view this page.
+        </p>
+      </div>
+    );
+  }
+
+
+
+
+
+
 
   const handleOpenModal = (ad?: any) => {
     if (ad) {

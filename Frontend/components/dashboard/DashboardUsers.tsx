@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pagination } from '../Pagination';
 import { api } from '../../services/api';
-
+import  useAuth  from '../../hooks/useAuth';
 /**
  * DashboardUsers Component
  *
@@ -28,6 +28,20 @@ const DashboardUsers: React.FC<DashboardUsersProps> = ({
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [isUserProfileModalOpen, setIsUserProfileModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+
+  const { hasRole } = useAuth();
+
+  if (!hasRole('Admin')) {
+    return (
+      <div className="bg-white border border-gray-100 shadow-sm rounded-sm p-6 text-center">
+        <h3 className="text-lg font-bold text-[#001733]">Access Denied</h3>
+        <p className="text-sm text-gray-500 mt-2">You do not have permission to view this page.</p>
+      </div>
+    );
+  }
+
+  // hasRole('Admin'); // Only admins can access this component
 
   const paginatedUsers = users.slice((usersPage - 1) * ITEMS_PER_PAGE, usersPage * ITEMS_PER_PAGE);
 

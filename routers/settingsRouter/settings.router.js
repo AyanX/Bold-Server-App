@@ -1,12 +1,12 @@
 // api/settings
 
 const express = require('express');
-const { getSettings,putSettings,passwordUpdate, getSystemStats } = require('../../controllers/settingsController/settings.controller');
+const { getSettings,putSettings,passwordUpdate, getSystemStats ,sideBarCollapsed} = require('../../controllers/settingsController/settings.controller');
 
 const settingsRouter = express.Router();
 
 settingsRouter.get("/",getSettings)
-
+settingsRouter.get("/sidebar-collapsed", sideBarCollapsed)
 settingsRouter.get("/theme", (req, res) => {
         const data= {
         mode: "dark",

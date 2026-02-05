@@ -228,9 +228,43 @@ async function getSystemStats(req, res) {
   }
 }
 
+const sideBarCollapsed = async (req, res) => {
+  try {
+    const collapsed = await db.select().from(settings).where(eq(settings.key, "sidebar_collapsed"));
+    if (collapsed.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: "Setting not found",
+      });
+    }
+    // Normalize stored value to a real boolean. The DB stores values as strings
+    // so ensure we interpret "true"/"1" as true and everything else as false.
+    const rawVal = collapsed[0].value;
+    const collapsedBool = rawVal === true || rawVal === 'true' || rawVal === '1';
+
+    return res.status(200).json({
+      status: 200,
+      message: "Sidebar collapsed state fetched successfully",
+      data: {
+        collapsed: collapsedBool,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating sidebar state:", error);
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+}
+
+
+
 module.exports = {
   getSettings,
   getSystemStats,
   putSettings,
   passwordUpdate,
+  sideBarCollapsed
 };
