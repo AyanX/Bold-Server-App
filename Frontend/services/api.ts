@@ -121,6 +121,9 @@ export const api = {
     async getAll() {
       return request<any[]>("/articles", {}, true); // Enable caching
     },
+    async getTheme(){
+      return request<any>("/settings/theme", {}, true);
+    },
     async get(id: string) {
       return request<any>(`/articles/${id}`, {}, true); // Enable caching
     },
@@ -366,6 +369,10 @@ export const api = {
     async getAll() {
       return request<any>("/settings", {}, true);
     },
+   async getTheme() {
+      return request<any>("/settings/theme", {}, true);
+    },
+
     async getByGroup(group: string) {
       return request<any>(`/settings/group/${group}`, {}, true);
     },

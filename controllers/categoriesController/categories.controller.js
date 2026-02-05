@@ -1,6 +1,7 @@
 const { categories, articles } = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq, like, sql } = require("drizzle-orm");
+const { capitalizeFirstLetter } = require("../utils");
 
 /**
  * GET /api/categories
@@ -21,7 +22,7 @@ const getAllCategories = async (req, res) => {
       message: "Categories fetched successfully",
     });
   } catch (err) {
-    console.error("❌ Error fetching categories:", err);
+    console.error("Error fetching categories:", err);
     res.status(500).json({
       message: "Internal server error",
       status: 500,
@@ -101,8 +102,14 @@ const createCategory = async (req, res) => {
 
     // Insert new category
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+    //  TRANSFORM THE NEW CATEGORY NAME TO USE FIRST LETTERS AS CAPITAL WORDS 
+
+    const formattedName = capitalizeFirstLetter(name);
+
+
      await db.insert(categories).values({
-      name: name.trim(),
+      name: formattedName,
       slug: slug.trim().toLowerCase(),
       color: categoryColor,
       articleCount: article_count || 0,
@@ -117,15 +124,13 @@ const createCategory = async (req, res) => {
       .where(eq(categories.slug, slug.trim().toLowerCase()))
       .limit(1);
 
-    console.log(`✅ Category created:`, newCategory[0]);
-
     return res.status(201).json({
       data: newCategory[0],
       message: "Category created successfully",
       status: 201,
     });
   } catch (error) {
-    console.error("❌ Error creating category:", error);
+    console.error(" Error creating category:", error);
     res.status(500).json({
       message: "Internal server error",
       status: 500,

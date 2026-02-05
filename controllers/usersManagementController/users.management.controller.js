@@ -73,7 +73,7 @@ const inviteUser = async (req, res) => {
       role: role || "Contributor",
       department: department || null,
       phone: phone || null,
-      bio: bio || null,
+      bio: bio || "No bio available.",
       otpHash: otpHash,
       otpExpiresAt: otpExpiresAt,
       invitedBy: `${invitor} ||  ${role}`,
@@ -617,7 +617,7 @@ const getUserStatistics = async (req, res) => {
       (u) => u.status === "inactive",
     ).length;
 
-    console.log("📊 User statistics fetched");
+    console.log("User statistics fetched");
 
     return res.status(200).json({
       status: 200,
@@ -640,11 +640,6 @@ const getUserStatistics = async (req, res) => {
   }
 };
 
-/**
- * ============================================================================
- * EXPORTS
- * ============================================================================
- */
 
 module.exports = {
   inviteUser,

@@ -107,6 +107,7 @@ const categories = mysqlTable(
     name: varchar({ length: 255 }).notNull(),
     slug: varchar({ length: 255 }).notNull(),
     articleCount: int("article_count").default(0).notNull(),
+    views: bigint({ mode: "number", unsigned: true }).default(0).notNull(),
     color: varchar({ length: 255 }).default("#001733").notNull(),
     createdAt: timestamp("created_at", { mode: "string" })
       .default(sql`now()`)

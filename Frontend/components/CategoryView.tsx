@@ -13,7 +13,7 @@ export const CategoryView: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
-  const categoryInfo = CATEGORIES.find(c => c.slug === slug) || { name: slug, slug: slug };
+  const categoryInfo = CATEGORIES.find(c => c.slug === slug   ) || { name: slug, slug: slug };
   const categoryName = categoryInfo.name;
 
   useEffect(() => {
@@ -21,17 +21,27 @@ export const CategoryView: React.FC = () => {
       setLoading(true);
       try {
         const res = await api.articles.getAll();
-        const allArticles = res.data || [];
+        const fetchedArticles = res.data || [];
+
+        // filter to these with status as published
+
+        const allArticles = fetchedArticles.filter((a: any) => a.status === 'Published');
 
         // Helper to normalize category for comparison
         const normalize = (s: string) => s?.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-');
 
+        const normalizedSlug = normalize(slug || '');
+
         const filtered = allArticles.filter((a: any) => {
             // Check if article category matches the current slug
-            const catSlug = CATEGORIES.find(c => c.name.toLowerCase() === a.category.toLowerCase())?.slug;
+            const catSlug = CATEGORIES.find(c => c.name.toLowerCase() === a.category.toLowerCase())?.slug
             const articleCategoryNormalized = normalize(a.category);
+            // find by name of the categories as well
+
             const categoriesNormalized = a.categories ? a.categories.map((c: string) => normalize(c)) : [];
-            return catSlug === slug || articleCategoryNormalized === slug || categoriesNormalized.includes(slug) || articleCategoryNormalized === 'opinion' && slug === 'opinions';
+            //  check a.slug === slug or normalized versions
+            const articleSlugNormalized = normalize(a.category.slug);
+            return  catSlug === slug || articleCategoryNormalized === slug || categoriesNormalized.includes(slug)  || categoriesNormalized.includes(normalizedSlug)     || articleSlugNormalized === normalizedSlug;
         });
 
         setArticles(filtered);

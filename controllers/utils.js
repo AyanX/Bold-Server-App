@@ -83,6 +83,15 @@ const createSlug = (title) => {
     .replace(/^-+|-+$/g, '');
 };
 
+const capitalizeFirstLetter = (string) => {
+  const formattedName = string
+  .trim()
+  .toLowerCase()
+  .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  return formattedName;
+}
+
 module.exports = {
   safeUser,
   getMySQLDateTime,
@@ -91,4 +100,5 @@ module.exports = {
   getUser,
   getClientIp,
   createSlug,
+  capitalizeFirstLetter,
 };

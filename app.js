@@ -70,14 +70,6 @@ app.post("/api/reset-password", (req, res) => {
   res.json({ message: "api working" });
 });
 
-// Article tracking endpoints
-app.post("/api/articles/:id/view", (req, res) => {
-  res.json({ message: "api working" });
-});
-
-app.post("/api/articles/:id/click", (req, res) => {
-  res.json({ message: "api working" });
-});
 
 // Public ads endpoint
 app.get("/api/ads/active", (req, res) => {

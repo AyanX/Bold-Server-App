@@ -37,6 +37,9 @@ const postAnalyticsData = async (req, res) => {
 
     const dateNow = getMySQLDateTime();
 
+    console.log("page url", req.body.page_url);
+    console.log("page_title", req.body.page_title);
+
     const pageViewData = {
       sessionId: req.body.session_id,
       pageUrl: req.body.page_url,

@@ -7,8 +7,18 @@ const settingsRouter = express.Router();
 
 settingsRouter.get("/",getSettings)
 
+settingsRouter.get("/theme", (req, res) => {
+        const data= {
+        mode: "dark",
+        primaryColor: "#e3ab10",
+        accentColor: "#fc3d39"
+    }
+    res.json(data)
+    
+})
+
 settingsRouter.get("/group/:group", (req, res) => {
-    res.json({ message: "api working" })
+res.json({ message: "api working" })
 })
 settingsRouter.put("/", putSettings)
 

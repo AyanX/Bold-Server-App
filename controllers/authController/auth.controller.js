@@ -4,48 +4,49 @@ const db = require("../../db/db");
 const { users } = require("../../drizzle/schema");
 const { generateToken } = require("../../utils/jwt/jwt");
 const { getClientIp } = require("request-ip");
+const { safeUser } = require("../utils");
 
 const isoDate = require("../../controllers/utils").getMySQLDateTime();
 
-const fakeLogin = async (req, res) => {
-  const token = generateToken({
-    id: 5,
-    role: "Admin",
-    email: "xhadyayan@gmail.com",
-    name: "xyz",
-  });
+// const fakeLogin = async (req, res) => {
+//   const token = generateToken({
+//     id: 5,
+//     role: "Admin",
+//     email: "xhadyayan@gmail.com",
+//     name: "xyz",
+//   });
 
-  res.cookie("token", token, {
-    httpOnly: true,
-    sameSite: "Lax", // Same-origin now
-    secure: false, // localhost
-    path: "/",
-    maxAge: 1000 * 60 * 60 * 24 * 7,
-  });
+//   res.cookie("token", token, {
+//     httpOnly: true,
+//     sameSite: "Lax", // Same-origin now
+//     secure: false, // localhost
+//     path: "/",
+//     maxAge: 1000 * 60 * 60 * 24 * 7,
+//   });
 
-  return res.json({
-    data: {
-      id: 1,
-      name: "John Doe",
-      email: "user@example.com",
-      role: "Admin",
-      status: "Active",
-      department: "Engineering",
-      phone: "+254712345678",
-      bio: "Sample bio",
-      image:
-        "https://cdn.example.com/storage/users/user_1674816600_abc12345.jpg",
-      linkedin: "linkedin.com/in/johndoe",
-      last_login_at: "2026-01-26T10:30:00Z",
-      last_login_ip: "192.168.1.1",
-      login_count: 5,
-      created_at: "2026-01-01T10:00:00Z",
-      updated_at: "2026-01-26T10:30:00Z",
-    },
-    message: "Login successful",
-    status: 200,
-  });
-};
+//   return res.json({
+//     data: {
+//       id: 1,
+//       name: "John Doe",
+//       email: "user@example.com",
+//       role: "Admin",
+//       status: "Active",
+//       department: "Engineering",
+//       phone: "+254712345678",
+//       bio: "Sample bio",
+//       image:
+//         "https://cdn.example.com/storage/users/user_1674816600_abc12345.jpg",
+//       linkedin: "linkedin.com/in/johndoe",
+//       last_login_at: "2026-01-26T10:30:00Z",
+//       last_login_ip: "192.168.1.1",
+//       login_count: 5,
+//       created_at: "2026-01-01T10:00:00Z",
+//       updated_at: "2026-01-26T10:30:00Z",
+//     },
+//     message: "Login successful",
+//     status: 200,
+//   });
+// };
 
 const signup = async (req, res) => {
   try {
@@ -125,7 +126,7 @@ const login = async (req, res) => {
       .where(eq(users.email, email.toLowerCase()))
       .limit(1);
 
-      // if user not found return
+    // if user not found return
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -144,12 +145,13 @@ const login = async (req, res) => {
 
     // Update login info
     const now = new Date().toISOString();
-    
+    const userIp = getClientIp(req);
+
     await db
       .update(users)
       .set({
-        last_login_at:  now,
-        last_login_ip: getClientIp(req),
+        last_login_at: isoDate,
+        last_login_ip: userIp,
         status: "Active",
         login_count: (user.login_count || 0) + 1,
       })
@@ -158,7 +160,10 @@ const login = async (req, res) => {
     // user data
     const userData = {
       id: user.id,
-      name: user.name,
+      name: user.name
+        .trim()
+        .toLowerCase()
+        .replace(/\b\w/g, (char) => char.toUpperCase()),
       email: user.email,
       role: user.role,
       status: user.status,
@@ -168,7 +173,6 @@ const login = async (req, res) => {
       bio: user.bio,
       linkedin: user.linkedin,
       last_login_at: user.last_login_at,
-      last_login_ip: user.last_login_ip,
       login_count: user.login_count,
       created_at: user.created_at,
       updated_at: user.updated_at,
@@ -178,19 +182,19 @@ const login = async (req, res) => {
 
     const safeUserData = safeUser(userData);
 
-
     // Generate JWT token
     const token = generateToken({
       id: user.id,
       role: user.role,
       email: user.email,
       name: user.name,
+      image: user.image,
     });
 
     res.cookie("token", token, {
       httpOnly: true,
       sameSite: "Lax", // Same-origin now
-      secure: process.env.NODE_ENV === "production", 
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     });
@@ -207,6 +211,7 @@ const login = async (req, res) => {
 };
 
 const logout = async (req, res) => {
+  console.log("Logout request received");
   const { email } = req.user;
 
   // if a user is not authenticated
@@ -214,7 +219,7 @@ const logout = async (req, res) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const now = isoDate();
+  const now = isoDate;
 
   //find the user
   try {
@@ -229,17 +234,19 @@ const logout = async (req, res) => {
       .update(users)
       .set({
         last_active: now,
-        status:"Inactive"
+        status: "Inactive",
       })
       .where(eq(users.id, user.id));
 
     // Clear the token cookie
 
+    console.log("Logging out user:", email);
     res.clearCookie("token", {
       httpOnly: true,
       sameSite: "Lax",
       secure: process.env.NODE_ENV === "production",
     });
+
     return res.status(200).json({ message: "Logout successful" });
   } catch (error) {
     console.error("Logout error:", error);

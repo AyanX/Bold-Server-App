@@ -19,6 +19,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  image?: string;
 }
 
 /**
@@ -103,6 +104,7 @@ function useAuth(): UseAuthReturn {
             name: result.data.name,
             email: result.data.email,
             role: result.data.role,
+            image: result.data.image,
           };
           setUser(userData);
           setIsLoggedIn(true);

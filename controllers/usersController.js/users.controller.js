@@ -3,6 +3,7 @@ const db = require("../../db/db");
 const { eq, like } = require("drizzle-orm");
 const crypto = require("crypto");
 const {hashPassword} = require("../../utils/bcrypt/bcrypt");
+const { safeUser } = require("../utils");
 
 //  Format datetime for MySQL
 const getMySQLDateTime = () => {
@@ -22,12 +23,9 @@ const getAllUsers = async (req, res) => {
     const allUsers = await query;
 
     // Remove passwords from response
-    const safeUsers = allUsers.map((user) => {
-      const { password, ...safeUser } = user;
-      return safeUser;
-    });
+    const safeUsers = allUsers.map((user) => safeUser(user));
 
-    console.log(`👥 Fetched ${safeUsers.length} users`);
+    console.log(`Fetched ${safeUsers.length} users`);
 
     return res.status(200).json({
       data: safeUsers,
@@ -190,7 +188,7 @@ const getUserById = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, role, bio, image, department, phone } = req.body;
+    const { name, email, role, bio, image, department, phone,linkedin } = req.body;
 
     // Validate ID
     if (!id || isNaN(Number(id))) {
@@ -261,6 +259,7 @@ const updateUser = async (req, res) => {
     if (image !== undefined) updateData.image = image || null;
     if (department !== undefined) updateData.department = department || null;
     if (phone !== undefined) updateData.phone = phone || null;
+    if (linkedin !== undefined) updateData.linkedin = linkedin || null;
 
     // Always update timestamp
     updateData.updated_at = getMySQLDateTime();
@@ -276,17 +275,15 @@ const updateUser = async (req, res) => {
       .limit(1);
 
     // Remove password
-    const { password: _, ...safeUser } = updatedUser[0];
 
-    console.log(`✏️ User updated:`, safeUser.email);
 
     return res.status(200).json({
-      data: safeUser,
+      data: safeUser(updatedUser[0]),
       message: "User updated successfully",
       status: 200,
     });
   } catch (error) {
-    console.error("❌ Error updating user:", error);
+    console.error(" Error updating user:", error);
     res.status(500).json({
       message: "Internal server error",
       status: 500,

@@ -9,7 +9,7 @@
 
 import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
-
+import {api} from '../services/api';
 /**
  * Available theme modes
  */
@@ -26,6 +26,7 @@ interface ThemeConfig {
   /** Accent color */
   accentColor: string;
 }
+
 
 /**
  * Theme context value type
@@ -49,9 +50,9 @@ interface ThemeContextValue {
  * Default theme configuration
  */
 const DEFAULT_THEME: ThemeConfig = {
-  mode: 'light',
-  primaryColor: '#001733',
-  accentColor: '#e5002b',
+mode: 'light',
+ primaryColor: '#001733',
+accentColor: '#e5002b',
 };
 
 /**
@@ -85,8 +86,39 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (theme.mode === 'system') {
       return systemPrefersDark ? 'dark' : 'light';
     }
-    return theme.mode;
+    return theme.mode ; //theme.mode is 'light' or 'dark'
   }, [theme.mode, systemPrefersDark]);
+
+//FETCH THEME FROM API ON MOUNT
+useEffect(() => {
+  let cancelled = false;
+
+  const loadThemeFromApi = async () => {
+    try {
+      const response = await api.settings.getTheme();
+
+      if (!response || cancelled) return;
+
+      const newTheme: ThemeConfig = {
+        mode: response.data.mode ?? DEFAULT_THEME.mode,
+        primaryColor: response.data.primaryColor ?? DEFAULT_THEME.primaryColor,
+        accentColor: response.data.accentColor ?? DEFAULT_THEME.accentColor,
+      };
+
+      
+      setTheme(newTheme);
+    } catch (err) {
+      console.error('Failed to load theme from API', err);
+    }
+  };
+
+  loadThemeFromApi();
+
+  return () => {
+    cancelled = true;
+  };
+}, [setTheme]);
+
 
   // Apply theme to document
   useEffect(() => {
@@ -101,7 +133,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.classList.add(resolvedTheme);
 
     // Update meta theme-color
+
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+
     if (metaThemeColor) {
       metaThemeColor.setAttribute(
         'content',
@@ -110,8 +144,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [theme, resolvedTheme]);
 
-  // Listen for system preference changes
-  useEffect(() => {
+    useEffect(() => {
     if (theme.mode !== 'system') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -120,6 +153,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     mediaQuery.addEventListener('change', handler);
     return () => mediaQuery.removeEventListener('change', handler);
   }, [theme, setTheme]);
+
+
+
+
+  // Listen for system preference changes
 
   const value = useMemo(
     (): ThemeContextValue => ({

@@ -1,10 +1,18 @@
-const { articles, users } = require("../../drizzle/schema");
+const {
+  articles,
+  users,
+  categories: categoriesDb,
+} = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq, sql, and } = require("drizzle-orm");
 
-const { createSlug } = require("../utils");
+const { createSlug, capitalizeFirstLetter } = require("../utils");
+
+//create an array of all category slugs
 
 function mapArticle(article) {
+  const allCategories = JSON.parse(article.categories || "[]");
+
   return {
     id: String(article.id),
     title: article.title,
@@ -12,7 +20,7 @@ function mapArticle(article) {
     excerpt: article.excerpt ?? "",
     image: article.image,
     category: article.category,
-    categories: JSON.parse(article.categories || "[]"),
+    categories: allCategories,
     author: article.author ?? "",
     date: article.created_at,
     readTime: article.read_time ?? "5 min read",
@@ -78,12 +86,24 @@ const addNewArticle = async (req, res) => {
       categoriesValue = categories;
     }
 
-    //find the image of the author and attach it to the article
+    // to do :::: attach the slug of the category to the categories field , .... frontend filtering logics...
 
+    // Update category article counts for existing categories
+
+    for (const cat of categoriesValue) {
+      await db
+        .update(categoriesDb)
+        .set({
+          articleCount: sql`${categoriesDb.articleCount} + 1`,
+        })
+        .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
+    }
+
+    //find the image of the author and attach it to the article
     const authorUser = await db
       .select()
       .from(users)
-      .where(eq(users.email, req.user.email))
+      .where(eq(users.id, req.user?.id))
       .limit(1);
 
     //if categories or tags are arrays, turn them into json objects
@@ -94,7 +114,7 @@ const addNewArticle = async (req, res) => {
       excerpt,
       category,
       image,
-      author,
+      author: author ? capitalizeFirstLetter(author) : capitalizeFirstLetter(req.user.name)    ,
       read_time,
       is_prime,
       status: status || "Published",
@@ -106,8 +126,10 @@ const addNewArticle = async (req, res) => {
       author_image: authorUser.length ? authorUser[0].image : null,
     });
 
+    //
+
     // Update user article counts
-    if (req.user && req.user.email) {
+  
       await db
         .update(users)
         .set({
@@ -127,18 +149,22 @@ const addNewArticle = async (req, res) => {
               ? sql`${users.articles_pending} + 1`
               : sql`${users.articles_pending}`,
         })
-        .where(eq(users.email, req.user.email));
-    }
+        .where(eq(users.id, req.user?.id  ));
+    
 
-    latestArticle = await db
+     // resend latest article added
+
+    const latestArticle = await db
       .select()
       .from(articles)
-      .where(eq(articles.slug, slug))
+      .orderBy(sql`${articles.created_at} DESC`)
       .limit(1);
 
-    latestArticle = latestArticle[0];
+    const dbArticle = latestArticle[0];
+
+    const mappedArticle = mapArticle(dbArticle);
     return res.status(201).json({
-      data: latestArticle,
+      data: mappedArticle,
       message: "Article added successfully",
       status: 201,
     });
@@ -229,6 +255,30 @@ const updateArticleById = async (req, res) => {
 
     if (!existingArticle.length) {
       return res.status(404).json({ error: "Article not found" });
+    }
+
+    // update categories counts if categories have changed
+    const oldCategories = JSON.parse(existingArticle[0].categories || "[]");
+
+    // Update category article counts for existing categories, decrement old categories
+
+    for (const cat of oldCategories) {
+      await db
+        .update(categoriesDb)
+        .set({
+          articleCount: sql`GREATEST(${categoriesDb.articleCount} - 1, 0)`,
+        })
+        .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
+    }
+    // Update category article counts for new categories, increment new categories
+
+    for (const cat of categoriesValue) {
+      await db
+        .update(categoriesDb)
+        .set({
+          articleCount: sql`${categoriesDb.articleCount} + 1`,
+        })
+        .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
     }
 
     // Update the article
@@ -351,57 +401,100 @@ const getArticlesByCategory = async (req, res) => {
 const deleteArticleById = async (req, res) => {
   const { id } = req.params;
 
-  if (!req.user.email) {
+  if (!req.user.email || !req.user.id) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  await db
-    .delete(articles)
-    .where(eq(articles.id, Number(id)))
-    .then(async (result) => {
-      if (result.rowCount === 0) {
-        return res.status(404).json({ error: "Article not found" });
-      }
+  try {
+    //find the user first who sent the request
+    let userAuthor = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, req.user.email));
 
-      // Update user article counts
-      if (req.user && req.user.email) {
-        const userAuthor = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, req.user.email));
-        const total = userAuthor[0].total_articles;
-        let published = userAuthor[0].articles_published;
+      //also check by id for the user
+    if (userAuthor.length === 0) {
+      userAuthor = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, req.user.id));
+    }
 
-        // Assuming we need to check if the deleted article was published
-        const deletedArticle = await db
-          .select()
-          .from(articles)
-          .where(eq(articles.id, Number(id)))
-          .limit(1);
+    if (userAuthor.length === 0) {
+      return res.status(404).json({ error: "Author user not found" });
+    }
 
-        if (deletedArticle.length && deletedArticle[0].status === "Published") {
-          if (published > 0) {
-            published -= 1;
-          } else {
-            published = 0;
-          }
+    // Check if article exists
+
+    const existingArticle = await db
+      .select()
+      .from(articles)
+      .where(eq(articles.id, Number(id)))
+      .limit(1);
+
+    if (!existingArticle.length) {
+      return res.status(404).json({ error: "Article not found" });
+    }
+
+    // author of the existing article
+
+
+     const articleAuthor = existingArticle[0].author;
+
+    // Check if the requesting user is the author of the article or has admin privileges
+    if (
+      articleAuthor.toLowerCase() !== req.user.name.toLowerCase() &&
+      req.user.role.toLowerCase() !== "admin"
+    ) {
+      console.log("Forbidden: User is not the author or admin", req.user.role);
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    //update category counts for the article categories
+    const articleCategories = JSON.parse(existingArticle[0].categories || "[]");
+
+    for (const cat of articleCategories) {
+      await db
+        .update(categoriesDb)
+        .set({
+          articleCount: sql`GREATEST(${categoriesDb.articleCount} - 1, 0)`,
+        })
+        .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
+    }
+
+    // Update user article counts
+      const total = userAuthor[0].total_articles;
+      let published = userAuthor[0].articles_published;
+
+      // Assuming we need to check if the deleted article was published
+
+      if (existingArticle.length && existingArticle[0].status === "Published") {
+        if (published > 0) {
+          published -= 1;
+        } else {
+          published = 0;
         }
-        //update user counts for articles
-        await db
-          .update(users)
-          .set({
-            total_articles: total > 0 ? total - 1 : 0,
-            articles_published: published,
-          })
-          .where(eq(users.email, req.user.email));
       }
 
-      res.status(200).json({ message: "Article deleted successfully" });
-    })
-    .catch((error) => {
-      console.error("Error deleting article:", error);
-      res.status(500).json({ error: "Internal server error" });
-    });
+      //update user counts for articles
+      await db
+        .update(users)
+        .set({
+          total_articles: total > 0 ? total - 1 : 0,
+          articles_published: published,
+        })
+        .where(eq(users.email, req.user.email));
+  
+
+    //delete the article
+
+    await db.delete(articles).where(eq(articles.id, Number(id)));
+
+    res.status(200).json({ message: "Article deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting article:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
 
 const trackView = async (req, res) => {
@@ -417,6 +510,24 @@ const trackView = async (req, res) => {
       return res.status(404).json({ error: "Article not found" });
     }
 
+    const viewedArticle = existingArticle[0];
+
+    const viewedArticleCategories = JSON.parse(
+      viewedArticle.categories || "[]",
+    );
+
+    //update category views count for categories
+
+    for (const cat of viewedArticleCategories) {
+      await db
+        .update(categoriesDb)
+        .set({
+          views: sql`${categoriesDb.views} + 1`,
+        })
+        .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
+    }
+
+    //update views count for article
     await db
       .update(articles)
       .set({ views: sql`${articles.views} + 1` })
