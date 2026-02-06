@@ -1,4 +1,4 @@
-//  /api/analytics/track
+//  /api/analytics
 
 const express = require('express');
 const { postAnalyticsData , getDashboardStats} = require('../../controllers/analyticsController/analytics.controller');

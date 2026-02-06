@@ -37,9 +37,6 @@ const postAnalyticsData = async (req, res) => {
 
     const dateNow = getMySQLDateTime();
 
-    console.log("page url", req.body.page_url);
-    console.log("page_title", req.body.page_title);
-
     const pageViewData = {
       sessionId: req.body.session_id,
       pageUrl: req.body.page_url,
@@ -103,7 +100,7 @@ const getDashboardStats =async  (req,res)=>{
 
     res.json({
       data: {
-        stats,
+        stats : {...stats, activeVisitors: liveTraffic.length},
         audienceGrowth,
         dailyPageViews,
         monthlyPageViews,
@@ -113,6 +110,7 @@ const getDashboardStats =async  (req,res)=>{
         articlesByCategory,
         usersByRole,
         liveTraffic,
+        
       },
       status: 200,
     });

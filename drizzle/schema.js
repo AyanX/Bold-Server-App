@@ -44,7 +44,7 @@ const articles = mysqlTable(
   "articles",
   {
     id: bigint({ mode: "number", unsigned: true }).autoincrement().primaryKey(),
-
+    author_id: bigint({ mode: "number", unsigned: true }).default(0).notNull(),
     title: varchar({ length: 255 }).notNull(),
     slug: varchar({ length: 255 }),
     excerpt: text().notNull(),
@@ -72,6 +72,7 @@ const articles = mysqlTable(
       .onUpdateNow()
       .notNull(),
       author_image: varchar("author_image", { length: 255 }),
+      blur_image: varchar("blur_image", { length: 255 }),
   },
   (table) => [unique("articles_slug_unique").on(table.slug)],
 );

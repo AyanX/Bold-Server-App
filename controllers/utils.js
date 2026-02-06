@@ -1,3 +1,7 @@
+const sharp = require("sharp");
+const fs = require("fs");
+const path = require("path");
+
 const getMySQLDateTime = () => {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
 };
@@ -59,13 +63,15 @@ const isLocalhost = (ip) =>
 
 const getClientIp = (req) => {
   try {
-    const ip = req.clientIp
+    const ip = req.clientIp;
 
-    // if (isLocalhost(ip)) {
-    //   //generate a random IP for localhost requests
-    //    const randomIp = Array.from({ length: 4 }, () => Math.floor(Math.random() * 256)).join(".");
-    //   return randomIp;
-    // }
+    if (isLocalhost(ip)) {
+      //generate a random IP for localhost requests
+      const randomIp = Array.from({ length: 4 }, () =>
+        Math.floor(Math.random() * 256),
+      ).join(".");
+      return randomIp;
+    }
 
     return ip;
   } catch (e) {
@@ -73,30 +79,69 @@ const getClientIp = (req) => {
   }
 };
 
-
 const createSlug = (title) => {
-  return (title || '')
+  return (title || "")
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 };
 
 const capitalizeFirstLetter = (string) => {
   const formattedName = string
-  .trim()
-  .toLowerCase()
-  .replace(/\b\w/g, (char) => char.toUpperCase());
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 
   return formattedName;
+};
+
+async function blurBase64Image(base64Image, blurName) {
+  // Remove data:image/...;base64, prefix
+  const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+
+  const buffer = Buffer.from(base64Data, "base64");
+  const date = Date.now();
+  const imgName = blurName || `blurred-${date}`;
+
+  // Build absolute path to public/storage/blurred-images
+  const outputDir = path.join(
+    process.cwd(), // project root
+    "public",
+    "storage",
+    "blurred-images",
+  );
+
+  // Ensure output directory exists
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+    console.log(`Created output directory: ${outputDir}`);
+  }
+
+  // Final file path
+  const outputPath = path.join(outputDir, `${imgName}.webp`);
+
+  // Blur and save image
+  await sharp(buffer)
+    .resize(800)
+    .blur(10)
+    .webp({ quality: 70 })
+    .toFile(outputPath);
+
+  // Return relative path for database / frontend
+  const blurredImgPath = `storage/blurred-images/${imgName}.webp`;
+
+  const blurUrl = `${process.env.APP_URL || "http://localhost:8000"}/${blurredImgPath}`;
+  
+  return blurUrl;
 }
 
 module.exports = {
   safeUser,
   getMySQLDateTime,
   uploadImageHelper,
-  sensitiveFields,
+  blurBase64Image,
   getUser,
   getClientIp,
   createSlug,

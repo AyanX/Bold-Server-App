@@ -11,6 +11,12 @@ const {
 } = require("../utils");
 
 const uploadProfileImage = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({
+      status: 401,
+      message: "Unauthorized",
+    });
+  }
   try {
     // Build relative path from uploaded file
     const { path: relativePath, url: publicUrl } = uploadImageHelper(req, res);
@@ -18,7 +24,7 @@ const uploadProfileImage = async (req, res) => {
     //update user's profile image path in database
     await db
       .update(users)
-      .set({ image: publicUrl })
+      .set({ image: path })
       .where(eq(users.email, req.user.email));
 
     return res.status(200).json({
@@ -108,10 +114,7 @@ const updateProfile = async (req, res) => {
     }
 
     // Update user in database
-    await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, id));
+    await db.update(users).set(updateData).where(eq(users.id, id));
 
     // Fetch updated user
     const updatedUser = await db
@@ -156,4 +159,3 @@ module.exports = {
   getProfile,
   updateProfile,
 };
-

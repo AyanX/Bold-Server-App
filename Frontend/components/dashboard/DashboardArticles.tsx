@@ -29,6 +29,7 @@ const DashboardArticles: React.FC<DashboardArticlesProps> = ({
   const [loading, setLoading] = useState(false);
   const contentRef = useRef<HTMLTextAreaElement>(null);
 
+
   const savedUser = JSON.parse(
     localStorage.getItem("user") ||
       '{"id":"1","name":"Admin","email":"admin@gmail.com","role":"Admin", "image":"https://i.pravatar.cc/150?u=admin"}',

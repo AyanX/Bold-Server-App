@@ -2,7 +2,7 @@ const { users } = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq, like } = require("drizzle-orm");
 const crypto = require("crypto");
-const {hashPassword} = require("../../utils/bcrypt/bcrypt");
+const { hashPassword } = require("../../utils/bcrypt/bcrypt");
 const { safeUser } = require("../utils");
 
 //  Format datetime for MySQL
@@ -19,13 +19,10 @@ const getAllUsers = async (req, res) => {
     const { search } = req.query;
     let query = db.select().from(users);
 
-
     const allUsers = await query;
 
     // Remove passwords from response
     const safeUsers = allUsers.map((user) => safeUser(user));
-
-    console.log(`Fetched ${safeUsers.length} users`);
 
     return res.status(200).json({
       data: safeUsers,
@@ -46,10 +43,16 @@ const getAllUsers = async (req, res) => {
  * Create a new user
  */
 const createUser = async (req, res) => {
-  console.log("Creating user with data:", req.body);
+  // if not admin => return
+  if (req.user.role !== "Admin") {
+    return res.status(403).json({
+      message: "Forbidden: Only admins can create users",
+      status: 403,
+    });
+  }
   //invited users handled here
   try {
-    const { name, email, linkedin, role, bio, image} = req.body;
+    const { name, email, linkedin, role, bio, image } = req.body;
 
     // Validate required fields
     if (!name || name.trim().length === 0) {
@@ -85,7 +88,7 @@ const createUser = async (req, res) => {
       .where(eq(users.email, email.toLowerCase()))
       .limit(1);
 
-      //email exists => return
+    //email exists => return
     if (existingUser.length > 0) {
       return res.status(422).json({
         message: "Validation failed",
@@ -104,7 +107,7 @@ const createUser = async (req, res) => {
       status: "Pending",
       bio: bio || null,
       image: image || null,
-      linkedin:linkedin|| null,
+      linkedin: linkedin || null,
       created_at: now,
       updated_at: now,
     });
@@ -116,12 +119,10 @@ const createUser = async (req, res) => {
       .where(eq(users.email, email.toLowerCase()))
       .limit(1);
 
-    const { password: _, ...safeUser } = newUser[0];
-
-    console.log(`User created:`, safeUser.email);
+    const newUserData = safeUser(newUser[0]);
 
     return res.status(201).json({
-      data: safeUser,
+      data: newUserData,
       message: "User created successfully",
       status: 201,
     });
@@ -164,16 +165,15 @@ const getUserById = async (req, res) => {
     }
 
     // Remove password
-    const { password, ...safeUser } = user[0];
 
-    console.log(`👤 Fetched user:`, safeUser.email);
+    const userData = safeUser(user[0]);
 
     return res.status(200).json({
-      data: safeUser,
+      data: userData,
       status: 200,
     });
   } catch (error) {
-    console.error("❌ Error fetching user:", error);
+    console.error(" Error fetching user:", error);
     res.status(500).json({
       message: "Internal server error",
       status: 500,
@@ -188,7 +188,8 @@ const getUserById = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, role, bio, image, department, phone,linkedin } = req.body;
+    const { name, email, role, bio, image, department, phone, linkedin } =
+      req.body;
 
     // Validate ID
     if (!id || isNaN(Number(id))) {
@@ -264,21 +265,57 @@ const updateUser = async (req, res) => {
     // Always update timestamp
     updateData.updated_at = getMySQLDateTime();
 
-    // Update user
-    await db.update(users).set(updateData).where(eq(users.id, Number(id)));
-
-    // Fetch updated user
+    // Fetch  user
     const updatedUser = await db
       .select()
       .from(users)
       .where(eq(users.id, Number(id)))
       .limit(1);
 
-    // Remove password
+    // ensure that the user is not trying to update another user's profile if they are not an admin
+    if (req.user.id !== Number(id) && req.user.role.toLowerCase() !== "admin") {
+      console.log(
+        "Unauthorized update attempt by user:",
+        req.user.id,
+        "on user:",
+        id,
+      );
+      console.log("User role:", req.user.role);
 
+      return res.status(403).json({
+        message: "Forbidden: You can only update your own profile",
+        status: 403,
+      });
+    }
+
+    // Ensure that the user is not trying to change their own role  if they are not an admin
+    if (req.user.role !== "Admin") {
+      if (updateData.role !== undefined) {
+        return res.status(403).json({
+          message: "Forbidden: Only admins can change roles or emails",
+          status: 403,
+        });
+      }
+    }
+
+    // Update user
+    await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, Number(id)));
+
+    // the new user object after update
+    const [newUpdatedUser] = await db
+  .select()
+  .from(users)
+  .where(eq(users.id, Number(id)))
+  .limit(1);
+
+
+    // Remove password and sensitive info from response
 
     return res.status(200).json({
-      data: safeUser(updatedUser[0]),
+      data: safeUser(newUpdatedUser),
       message: "User updated successfully",
       status: 200,
     });

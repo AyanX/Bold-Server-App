@@ -29,11 +29,11 @@ class AnalyticsService {
     // Recent activity (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
+      // articles count added in the last 7 days
     const [recentActivity] = await db
       .select({ count: count() })
-      .from(activityLogs)
-      .where(gte(activityLogs.createdAt, sevenDaysAgo));
+      .from(articles)
+      .where(gte(articles.created_at, sevenDaysAgo));
 
     // Page view stats
     const [totalPageViews] = await db.select({ count: count() }).from(pageViews);
@@ -240,20 +240,21 @@ class AnalyticsService {
   }
 
   static async getArticlesByCategory() {
+    //from categories table, get category name and count of articles in each category
     const categoryStats = await db
-      .select({
-        category: articles.category,
-        count: count(),
-      })
-      .from(articles)
-      .groupBy(articles.category)
-      .orderBy(desc(count()));
+  .select({
+    name: categories.name,
+    articleCount: categories.articleCount,
+  })
+  .from(categories)
+  .orderBy(desc(categories.articleCount))
+  .limit(10);
 
     const colors = ['#e5002b', '#001733', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316'];
 
     return categoryStats.map((cat, index) => ({
-      category: cat.category,
-      count: cat.count,
+      category: cat.name,
+      count: cat.articleCount,
       color: colors[index % colors.length],
     }));
   }
@@ -274,25 +275,33 @@ class AnalyticsService {
     const fifteenMinutesAgo = new Date();
     fifteenMinutesAgo.setMinutes(fifteenMinutesAgo.getMinutes() - 15);
 
-    const recentViews = await db
-      .select({
-        country: pageViews.country,
-        countryCode: pageViews.countryCode,
-        latitude: pageViews.latitude,
-        longitude: pageViews.longitude,
-        count: count(),
-      })
-      .from(pageViews)
-      .where(and(
-        sql`${pageViews.latitude} IS NOT NULL`,
-        sql`${pageViews.longitude} IS NOT NULL`,
-        gte(pageViews.createdAt, fifteenMinutesAgo)
-      ))
-      .groupBy(pageViews.country, pageViews.countryCode, pageViews.latitude, pageViews.longitude)
-      .orderBy(desc(count()))
-      .limit(20);
+const recentViews = await db
+  .select({
+    country: pageViews.country,
+    countryCode: pageViews.countryCode,
+    latitude: pageViews.latitude,
+    longitude: pageViews.longitude,
+    count: count(),
+  })
+  .from(pageViews)
+  .where(and(
+    sql`${pageViews.latitude} IS NOT NULL`,
+    sql`${pageViews.longitude} IS NOT NULL`,
+    sql`${pageViews.createdAt} >= UTC_TIMESTAMP() - INTERVAL 15 MINUTE`
+  ))
+  .groupBy(
+    pageViews.country,
+    pageViews.countryCode,
+    pageViews.latitude,
+    pageViews.longitude
+  )
+  .orderBy(desc(count()))
+  .limit(20);
 
-    return recentViews.map(view => {
+
+
+
+    const liveTraffic= recentViews.map(view => {
       // Convert lat/lon to CSS position percentages
       const top = Math.max(5, Math.min(95, 50 - (Number(view.latitude) / 1.8)));
       const left = Math.max(5, Math.min(95, 50 + (Number(view.longitude) / 3.6)));
@@ -307,6 +316,9 @@ class AnalyticsService {
         left: `${left}%`,
       };
     });
+
+    return liveTraffic;
+
   }
 }
 

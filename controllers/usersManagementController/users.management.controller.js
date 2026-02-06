@@ -30,7 +30,6 @@ const inviteUser = async (req, res) => {
   try {
     const { name, email, role, department, phone, bio, image } = req.body;
 
-    console.log("adding a new user ", req.body);
     // Validation
     if (!name || !email || !role) {
       return res.status(400).json({
@@ -473,7 +472,7 @@ const uploadUserImage = async (req, res) => {
       });
     }
 
-    // In production, upload to cloud storage (AWS S3, etc.)
+    
     const imagePath = `/uploads/users/${id}/${Date.now()}-${req.file.originalname}`;
 
     return res.status(200).json({
