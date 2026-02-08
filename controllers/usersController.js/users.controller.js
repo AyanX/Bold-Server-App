@@ -306,11 +306,10 @@ const updateUser = async (req, res) => {
 
     // the new user object after update
     const [newUpdatedUser] = await db
-  .select()
-  .from(users)
-  .where(eq(users.id, Number(id)))
-  .limit(1);
-
+      .select()
+      .from(users)
+      .where(eq(users.id, Number(id)))
+      .limit(1);
 
     // Remove password and sensitive info from response
 
@@ -333,8 +332,33 @@ const updateUser = async (req, res) => {
  * Delete a user by ID
  */
 const deleteUser = async (req, res) => {
+  const { id: adminId } = req.user.id; // ID of the user making the request
+
   try {
     const { id } = req.params;
+
+    // check if request was sent by an admin
+
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({
+        message: "Forbidden: Only admins can delete users",
+        status: 403,
+      });
+    }
+
+    // confirm user role before deletion to prevent unauthorized deletions
+    const userRole = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, Number(adminId)))
+      .limit(1);
+
+    if (userRole.length === 0 || userRole[0].role !== "Admin") {
+      return res.status(403).json({
+        message: "Forbidden: Only admins can delete users",
+        status: 403,
+      });
+    }
 
     // Validate ID
     if (!id || isNaN(Number(id))) {
@@ -358,12 +382,8 @@ const deleteUser = async (req, res) => {
       });
     }
 
-    const userName = existingUser[0].name;
-
     // Delete user
     await db.delete(users).where(eq(users.id, Number(id)));
-
-    console.log(` User deleted:`, userName);
 
     return res.status(200).json({
       message: "User deleted successfully",

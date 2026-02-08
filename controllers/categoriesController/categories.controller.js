@@ -11,10 +11,12 @@ const getAllCategories = async (req, res) => {
   try {
     const { search } = req.query;
     let query = db.select().from(categories);
+
     // Optional search filter
     if (search && search.trim()) {
       query = query.where(like(categories.name, `%${search.trim()}%`));
     }
+    
     const allCategories = await query;
     return res.status(200).json({
       data: allCategories,

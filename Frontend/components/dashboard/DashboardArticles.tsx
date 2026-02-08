@@ -67,6 +67,7 @@ const DashboardArticles: React.FC<DashboardArticlesProps> = ({
   );
 
   const handleOpenModal = (article?: any) => {
+
     if (article) {
       setEditingId(article.id);
       setFormData({
@@ -299,13 +300,17 @@ const DashboardArticles: React.FC<DashboardArticlesProps> = ({
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 flex-shrink-0 bg-gray-100 rounded-sm overflow-hidden border border-gray-100">
-                          {article.image ? (
+                          {article.blur_image ? (
                             <img
-                              src={article.image}
+                              src={ article.blur_image}
                               className="w-full h-full object-cover"
-                              alt=""
+                              alt={article.title}
                             />
-                          ) : (
+                          ) :   article.image ? ( <img
+                              src={ article.image}
+                              className="w-full h-full object-cover"
+                              alt={article.title}
+                            />) :  (
                             <div className="w-full h-full flex items-center justify-center text-gray-300">
                               <svg
                                 className="w-6 h-6"
@@ -801,12 +806,12 @@ const DashboardArticles: React.FC<DashboardArticlesProps> = ({
                         >
                           <input
                             type="checkbox"
-                            checked={formData.categories.includes(cat.name)}
+                            checked={formData.categories.includes(cat.name.toLowerCase())}
                             onChange={(e) => {
                               const newCategories = e.target.checked
-                                ? [...formData.categories, cat.name]
+                                ? [...formData.categories, cat.name.toLowerCase()]
                                 : formData.categories.filter(
-                                    (c) => c !== cat.name,
+                                    (c) => c !== cat.name.toLowerCase(),
                                   );
                               setFormData({
                                 ...formData,

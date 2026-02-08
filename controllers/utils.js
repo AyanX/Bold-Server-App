@@ -1,6 +1,8 @@
 const sharp = require("sharp");
 const fs = require("fs");
 const path = require("path");
+const axios = require("axios");
+
 
 const getMySQLDateTime = () => {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
@@ -65,13 +67,13 @@ const getClientIp = (req) => {
   try {
     const ip = req.clientIp;
 
-    if (isLocalhost(ip)) {
-      //generate a random IP for localhost requests
-      const randomIp = Array.from({ length: 4 }, () =>
-        Math.floor(Math.random() * 256),
-      ).join(".");
-      return randomIp;
-    }
+    // if (isLocalhost(ip)) {
+    //   //generate a random IP for localhost requests
+    //   const randomIp = Array.from({ length: 4 }, () =>
+    //     Math.floor(Math.random() * 256),
+    //   ).join(".");
+    //   return randomIp;
+    // }
 
     return ip;
   } catch (e) {
@@ -88,58 +90,110 @@ const createSlug = (title) => {
     .replace(/^-+|-+$/g, "");
 };
 
-const capitalizeFirstLetter = (string) => {
-  const formattedName = string
-    .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+const capitalizeFirstLetter = (data) => {
+  const capitalize = (str) =>
+    str.replace(/(^|\s)\S/g, (char) => char.toUpperCase());
 
-  return formattedName;
+  if (Array.isArray(data)) {
+    return data
+      .map((item) => capitalize(item.trim().toLowerCase()))
+      .join(", ");
+  } else {
+    return capitalize(data.trim().toLowerCase());
+  }
 };
 
-async function blurBase64Image(base64Image, blurName) {
-  // Remove data:image/...;base64, prefix
-  const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
 
-  const buffer = Buffer.from(base64Data, "base64");
-  const date = Date.now();
-  const imgName = blurName || `blurred-${date}`;
-
-  // Build absolute path to public/storage/blurred-images
-  const outputDir = path.join(
-    process.cwd(), // project root
-    "public",
-    "storage",
-    "blurred-images",
-  );
-
-  // Ensure output directory exists
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-    console.log(`Created output directory: ${outputDir}`);
+async function fetchImageBuffer(imageInput) {
+  // Base64 image
+  if (typeof imageInput === "string" && imageInput.startsWith("data:image")) {
+    const base64Data = imageInput.replace(/^data:image\/\w+;base64,/, "");
+    return Buffer.from(base64Data, "base64");
   }
 
-  // Final file path
-  const outputPath = path.join(outputDir, `${imgName}.webp`);
+  // URL image (http or https)
+  if (typeof imageInput === "string" && /^https?:\/\//.test(imageInput)) {
+    const response = await axios.get(imageInput, {
+      responseType: "arraybuffer",
+      headers: {
+        "User-Agent": "Mozilla/5.0", // Some servers reject default Node UA
+        Accept: "image/*",
+      },
+      maxRedirects: 5,   // Handle redirects (common for Unsplash)
+      timeout: 20000,    // 20 seconds timeout
+    });
+    return Buffer.from(response.data);
+  }
 
-  // Blur and save image
-  await sharp(buffer)
-    .resize(800)
-    .blur(10)
-    .webp({ quality: 70 })
-    .toFile(outputPath);
-
-  // Return relative path for database / frontend
-  const blurredImgPath = `storage/blurred-images/${imgName}.webp`;
-
-  const blurUrl = `${process.env.APP_URL || "http://localhost:8000"}/${blurredImgPath}`;
-  
-  return blurUrl;
+  throw new Error("Unsupported image format");
 }
+
+// blur image and save it
+
+async function blurBase64Image(imageInput, blurName) {
+  try {
+    const buffer = await fetchImageBuffer(imageInput);
+    const date = Date.now();
+    const imgName = blurName || `blurred-${date}`;
+
+    // Absolute path → public/storage/blurred-images
+    const outputDir = path.join(process.cwd(), "public", "storage", "blurred-images");
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+    const outputPath = path.join(outputDir, `${imgName}.webp`);
+
+    // Blur & save
+    await sharp(buffer)
+      .resize(800)
+      .blur(10)
+      .webp({ quality: 70 })
+      .toFile(outputPath);
+
+    const relativePath = `storage/blurred-images/${imgName}.webp`;
+    const blurUrl = `${process.env.APP_URL || "http://localhost:8000"}/${relativePath}`;
+
+    return blurUrl;
+  } catch (error) {
+    console.error("Error processing image: ",blurName, "--------************-------" , error.message);
+    throw error;
+  }
+}
+
+// save image to storage
+
+
+async function saveBase64Image(imageInput, imageName) {
+  try {
+    const buffer = await fetchImageBuffer(imageInput);
+
+    const date = Date.now();
+    const imgName = imageName || `image-${date}`;
+
+    // Absolute path → public/storage/articles
+    const outputDir = path.join(process.cwd(), "public", "storage", "articles");
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+    const outputPath = path.join(outputDir, `${imgName}.webp`);
+
+    // Save & normalize image
+    await sharp(buffer).resize(1000).webp({ quality: 85 }).toFile(outputPath);
+
+    // Public URL
+    const relativePath = `storage/articles/${imgName}.webp`;
+    const url = `${process.env.APP_URL || "http://localhost:8000"}/${relativePath}`;
+
+    return url;
+  } catch (error) {
+    console.error("Error saving image:", error.message);
+    throw error;
+  }
+}
+
 
 module.exports = {
   safeUser,
   getMySQLDateTime,
+  saveBase64Image,
   uploadImageHelper,
   blurBase64Image,
   getUser,

@@ -10,6 +10,7 @@ const {
   createSlug,
   capitalizeFirstLetter,
   blurBase64Image,
+  saveBase64Image,
 } = require("../utils");
 
 //create an array of all category slugs
@@ -24,7 +25,7 @@ function mapArticle(article) {
     excerpt: article.excerpt ?? "",
     image: article.image,
     category: article.category,
-    categories: allCategories,
+    categories: Array.isArray(allCategories) ? allCategories : [allCategories],
     author: article.author ?? "",
     date: article.created_at,
     readTime: article.read_time ?? "5 min read",
@@ -40,6 +41,7 @@ function mapArticle(article) {
     created_at: article.created_at,
     updated_at: article.updated_at,
     authorImage: article.author_image || null,
+    blur_image: article.blur_image || null,
   };
 }
 
@@ -110,66 +112,52 @@ const addNewArticle = async (req, res) => {
       .where(eq(users.id, req.user?.id))
       .limit(1);
 
-    // Create an img blur from the base 64 sent as img in the background
-
-    blurBase64Image(image, `blur-${slug}`)
-      .then((blurredPath) => {
-        console.log(blurredPath)
-
-        db.update(articles)
-          .set({ blur_image:blurredPath})
-          .where(eq(articles.slug, slug))
-          .catch((err) => console.error("Failed to update blur image:", err));
-      })
-      .catch((err) => console.error("Blur generation failed", err));
-
+    //save image as url
     //if categories or tags are arrays, turn them into json objects
-    await db.insert(articles).values({
-      categories: JSON.stringify(categoriesValue),
-      title,
-      slug,
-      excerpt,
-      author_id: Number(req.user.id),
-      category,
-      image,
-      author: author
-        ? capitalizeFirstLetter(author)
-        : capitalizeFirstLetter(req.user.name),
-      read_time,
-      is_prime,
-      status: status || "Published",
-      content,
-      is_headline,
-      seo_score,
-      created_at: now,
-      updated_at: now,
-      author_image: authorUser.length ? authorUser[0].image : null,
+    await db.transaction(async (tx) => {
+      // insert article
+      await tx.insert(articles).values({
+        categories: capitalizeFirstLetter(JSON.stringify(categoriesValue)),
+        title,
+        slug,
+        excerpt,
+        author_id: Number(req.user.id),
+        category: capitalizeFirstLetter(category),
+        image,
+        author: author
+          ? capitalizeFirstLetter(author)
+          : capitalizeFirstLetter(req.user.name),
+        read_time,
+        is_prime,
+        status: capitalizeFirstLetter(status) || "Published",
+        content,
+        is_headline,
+        seo_score,
+        created_at: now,
+        updated_at: now,
+        author_image: authorUser.length ? authorUser[0].image : null,
+      });
+
+      // update user article counts
+      await tx
+        .update(users)
+        .set({
+          total_articles: sql`${users.total_articles} + 1`,
+          articles_published:
+            (status || "Published") === "Published"
+              ? sql`${users.articles_published} + 1`
+              : sql`${users.articles_published}`,
+          articles_drafted:
+            status === "Draft"
+              ? sql`${users.articles_drafted} + 1`
+              : sql`${users.articles_drafted}`,
+          articles_pending:
+            status === "Pending"
+              ? sql`${users.articles_pending} + 1`
+              : sql`${users.articles_pending}`,
+        })
+        .where(eq(users.id, req.user?.id));
     });
-
-    //
-
-    // Update user article counts
-
-    await db
-      .update(users)
-      .set({
-        total_articles: sql`${users.total_articles} + 1`,
-        articles_published:
-          (status || "Published") === "Published"
-            ? sql`${users.articles_published} + 1`
-            : sql`${users.articles_published}`,
-        //draft articles
-        articles_drafted:
-          status === "Draft"
-            ? sql`${users.articles_drafted} + 1`
-            : sql`${users.articles_drafted}`,
-        //pending articles
-        articles_pending:
-          status === "Pending"
-            ? sql`${users.articles_pending} + 1`
-            : sql`${users.articles_pending}`,
-      })
-      .where(eq(users.id, req.user?.id));
 
     // resend latest article added
 
@@ -182,38 +170,112 @@ const addNewArticle = async (req, res) => {
     const dbArticle = latestArticle[0];
 
     const mappedArticle = mapArticle(dbArticle);
-    return res.status(201).json({
+
+    //return the article added as response
+
+    res.status(201).json({
       data: mappedArticle,
       message: "Article added successfully",
       status: 201,
     });
+
+    // If `image` is a base64/data URL then attempt to generate a blurred
+    // preview and upload the real file.
+    if (
+      typeof image === "string" &&
+      (image.startsWith("data:") ||
+        image.startsWith("http://") ||
+        image.startsWith("https://"))
+    ) {
+      // create blurred preview (background) and update article record
+      blurBase64Image(image, `blur-${slug}`)
+        .then((blurredPath) => {
+          // update the blur_image column
+          db.update(articles)
+            .set({ blur_image: blurredPath })
+            .where(eq(articles.slug, slug))
+            .catch((err) => console.error("Failed to add blur image to db :", err));
+        })
+        .catch((err) => console.error("Failed to create blurred image  :    ",slug ,"--------************-------", err));
+
+      try {
+        // upload the original and replace the stored base64 with the URL
+        const imageUrl = await saveBase64Image(image, slug);
+        await db
+          .update(articles)
+          .set({ image: imageUrl })
+          .where(eq(articles.slug, slug));
+      } catch (err) {
+        console.error("Failed to save base64 image or update DB:   " ,slug , err);
+        try {
+          await db
+            .update(articles)
+            .set({ image })
+            .where(eq(articles.slug, slug));
+        } catch (innerErr) {
+          console.error("Failed to persist fallback base64 image:", innerErr);
+        }
+      }
+    } else {
+    }
+
+    // Attach the slugs of the categories to the categories field for better frontend filtering // only if the
+    // categories does not match its slug in db
+
+    for (const cat of categoriesValue) {
+      const categoryRow = await db
+        .select()
+        .from(categoriesDb)
+        .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`)
+        .limit(1);
+
+      // add the slug of the category to the categoriesValue array if it exists and is not already included
+      if (categoryRow.length) {
+        const categorySlug = categoryRow[0].slug;
+        if (!categoriesValue.includes(categorySlug)) {
+          categoriesValue.push(categorySlug);
+        }
+      }
+    }
+
+    // Update the article with the generated slugs
+    await db
+      .update(articles)
+      .set({ categories: JSON.stringify(categoriesValue) })
+      .where(eq(articles.slug, slug));
+
+    
+    return;
   } catch (error) {
     console.error("Error adding article:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
-
 const getArticleByIdOrSlug = async (req, res) => {
   try {
     const { identifier } = req.params;
 
     //the identifier can be either id or slug
-
+    // Robust ID detection: convert to number and check for integer
+    const idNum = Number(identifier);
     let article;
-    if (isNaN(identifier)) {
-      // It's a slug title,  check it vs slug titles
-
+    if (!Number.isNaN(idNum) && Number.isInteger(idNum)) {
+      // Treat as numeric id
       article = await db
         .select()
         .from(articles)
-        .where(eq(createSlug(articles.title), identifier))
+        .where(eq(articles.id, idNum))
         .limit(1);
     } else {
-      // It's an ID
+      // Treat as slug: compare against stored `slug` column (case-insensitive)
+      // NOTE: previously the code attempted to call createSlug on the DB column,
+      // which is invalid. Querying the stored slug is reliable and efficient.
       article = await db
         .select()
         .from(articles)
-        .where(eq(articles.id, Number(identifier)))
+        .where(
+          sql`LOWER(${articles.slug}) = ${String(identifier).toLowerCase()}`,
+        )
         .limit(1);
     }
 
@@ -276,19 +338,24 @@ const updateArticleById = async (req, res) => {
       return res.status(404).json({ error: "Article not found" });
     }
 
-    const articleAuthor = existingArticle[0].author;
+    const articleAuthor = existingArticle[0].author || "";
+
+    // Safely normalize strings before calling toLowerCase()
+    const articleAuthorNormalized = String(articleAuthor).toLowerCase();
+    const requestUserName = String(req.user?.name || "").toLowerCase();
+    const requestUserRole = String(req.user?.role || "").toLowerCase();
 
     // Check if the requesting user is the author of the article or has admin privileges
     if (
-      articleAuthor.toLowerCase() !== req.user.name.toLowerCase() &&
-      req.user.role.toLowerCase() !== "admin"
+      articleAuthorNormalized !== requestUserName &&
+      requestUserRole !== "admin"
     ) {
-      // incase a user changed name, check by author_id in articles  as well req.user.id
+      // In case a user changed name, fall back to checking author_id
       if (existingArticle[0].author_id !== Number(req.user.id)) {
         console.log(
           "Forbidden: User is not the author or admin",
-          req.user.role,
-          req.user.id,
+          req.user?.role,
+          req.user?.id,
         );
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -352,16 +419,22 @@ const updateArticleById = async (req, res) => {
 
     const mappedArticle = mapArticle(dbArticle);
 
-    // Update user article counts
+    // Update user article counts: fetch the author row safely with limit(1)
     const userAuthor = await db
       .select()
       .from(users)
-      .where(eq(users.id, existingArticle[0].author_id));
+      .where(eq(users.id, existingArticle[0].author_id))
+      .limit(1);
 
-    const total = userAuthor[0].total_articles;
-    let published = userAuthor[0].articles_published;
-    let drafted = userAuthor[0].articles_drafted;
-    let pending = userAuthor[0].articles_pending;
+    if (!userAuthor.length) {
+      // If the author row is missing, log and default counters to 0 (best-effort)
+      console.warn("Author row not found when updating counts for article", id);
+    }
+
+    const total = userAuthor.length ? userAuthor[0].total_articles : 0;
+    let published = userAuthor.length ? userAuthor[0].articles_published : 0;
+    let drafted = userAuthor.length ? userAuthor[0].articles_drafted : 0;
+    let pending = userAuthor.length ? userAuthor[0].articles_pending : 0;
 
     const oldStatus = existingArticle[0].status;
     const newStatus = status || "Published";
@@ -440,66 +513,46 @@ const deleteArticleById = async (req, res) => {
   if (!req.user.email || !req.user.id) {
     return res.status(401).json({ error: "Unauthorized" });
   }
+  // Check if article exists
+
+  const existingArticle = await db
+    .select()
+    .from(articles)
+    .where(eq(articles.id, Number(id)))
+    .limit(1);
 
   try {
-    //find the user first who sent the request
-    let userAuthor = await db
+    // Find the requesting user row (limit 1 for safety)
+    const userAuthor = await db
       .select()
       .from(users)
-      .where(eq(users.id, req.user.id));
+      .where(eq(users.id, existingArticle[0].author_id))
+      .limit(1);
 
-    if (userAuthor.length === 0) {
+    if (!userAuthor.length) {
       return res.status(404).json({ error: "Author user not found" });
     }
-
-    // Check if article exists
-
-    const existingArticle = await db
-      .select()
-      .from(articles)
-      .where(eq(articles.id, Number(id)))
-      .limit(1);
 
     if (!existingArticle.length) {
       return res.status(404).json({ error: "Article not found" });
     }
 
-    // author of the existing article
-
-    const articleAuthor = existingArticle[0].author;
+    // normalize strings
+    const requestUserRole = String(req.user?.role || "").toLowerCase();
 
     // Check if the requesting user is the author of the article or has admin privileges
-    if (
-      articleAuthor.toLowerCase() !== req.user.name.toLowerCase() &&
-      req.user.role.toLowerCase() !== "admin"
-    ) {
-      if (existingArticle[0].author_id !== Number(req.user.id)) {
-        console.log(
-          "Forbidden: User is not the author or admin",
-          req.user.role,
-          req.user.id,
-        );
-        return res.status(403).json({ error: "Forbidden" });
-      }
+    const isAdmin = requestUserRole === "admin";
+    const isAuthor = existingArticle[0].author_id === Number(req.user.id);
+
+    if (!isAdmin && !isAuthor) {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
-    //update category counts for the article categories
-    const articleCategories = JSON.parse(existingArticle[0].categories || "[]");
+    // Update user article count
+    const total = userAuthor.length ? userAuthor[0].total_articles : 0;
+    let published = userAuthor.length ? userAuthor[0].articles_published : 0;
 
-    for (const cat of articleCategories) {
-      await db
-        .update(categoriesDb)
-        .set({
-          articleCount: sql`GREATEST(${categoriesDb.articleCount} - 1, 0)`,
-        })
-        .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
-    }
-
-    // Update user article counts
-    const total = userAuthor[0].total_articles;
-    let published = userAuthor[0].articles_published;
-
-    // Assuming we need to check if the deleted article was published
+    //  check if the deleted article was published
 
     if (existingArticle.length && existingArticle[0].status === "Published") {
       if (published > 0) {
@@ -509,21 +562,41 @@ const deleteArticleById = async (req, res) => {
       }
     }
 
-    //update user counts for articles
+    let articleCategories = [];
+    try {
+      articleCategories = JSON.parse(existingArticle[0].categories || "[]");
+    } catch (err) {
+      articleCategories = [];
+    }
 
-    await db
-      .update(users)
-      .set({
-        total_articles: total > 0 ? total - 1 : 0,
-        articles_published: published,
-      })
-      .where(eq(users.id, existingArticle[0].author_id));
+    // transaction to delete article and update counts atomically
+    await db.transaction(async (tx) => {
+      // update user article counts
+      await tx
+        .update(users)
+        .set({
+          total_articles: total > 0 ? total - 1 : 0,
+          articles_published: published,
+        })
+        .where(eq(users.id, existingArticle[0].author_id));
 
-    //delete the article
+      // update category counts
+      for (const cat of articleCategories) {
+        console.log("Decrementing article count for category:", cat);
 
-    await db.delete(articles).where(eq(articles.id, Number(id)));
+        await tx
+          .update(categoriesDb)
+          .set({
+            articleCount: sql`GREATEST(${categoriesDb.articleCount} - 1, 0)`,
+          })
+          .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
+      }
 
-    res.status(200).json({ message: "Article deleted successfully" });
+      // delete the article
+      await tx.delete(articles).where(eq(articles.id, Number(id)));
+    });
+
+    return res.status(200).json({ message: "Article deleted successfully" });
   } catch (error) {
     console.error("Error deleting article:", error);
     res.status(500).json({ error: "Internal server error" });
