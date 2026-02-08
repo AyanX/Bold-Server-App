@@ -9,7 +9,8 @@ const getMySQLDateTime = () => {
 };
 
 const uploadImageHelper = (req, res) => {
-  //if user not authenticated
+try {
+    //if user not authenticated
   if (!req.user) {
     throw new Error("Unauthorized");
   }
@@ -20,12 +21,16 @@ const uploadImageHelper = (req, res) => {
   const baseUrl = process.env.APP_URL || "http://localhost:8000";
   const publicUrl = `${baseUrl}/storage/${relativePath}`;
 
-  console.log(`Image uploaded successfully: ${req.file.filename}`);
+
 
   return {
     path: relativePath,
     url: publicUrl,
   };
+} catch (error) {
+  console.error("Error uploading profile image:", error.message);
+  throw error;
+}
 };
 
 const sensitiveFields = [

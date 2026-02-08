@@ -4,7 +4,7 @@ const {
   categories: categoriesDb,
 } = require("../../drizzle/schema");
 const db = require("../../db/db");
-const { eq, sql, and } = require("drizzle-orm");
+const { eq, sql, and, desc } = require("drizzle-orm");
 
 const {
   createSlug,
@@ -18,6 +18,9 @@ const {
 function mapArticle(article) {
   const allCategories = JSON.parse(article.categories || "[]");
 
+  const toUpperCaseFirstLetter = allCategories.map((cat) =>
+    capitalizeFirstLetter(cat),
+  );
   return {
     id: String(article.id),
     title: article.title,
@@ -25,7 +28,9 @@ function mapArticle(article) {
     excerpt: article.excerpt ?? "",
     image: article.image,
     category: article.category,
-    categories: Array.isArray(allCategories) ? allCategories : [allCategories],
+    categories: Array.isArray(toUpperCaseFirstLetter)
+      ? toUpperCaseFirstLetter
+      : [toUpperCaseFirstLetter],
     author: article.author ?? "",
     date: article.created_at,
     readTime: article.read_time ?? "5 min read",
@@ -47,7 +52,10 @@ function mapArticle(article) {
 
 const getAllArticles = async (req, res) => {
   try {
-    const allArticles = await db.select().from(articles);
+    const allArticles = await db
+      .select()
+      .from(articles)
+      .orderBy(desc(articles.created_at));
 
     const mappedArticles = allArticles.map((article) => mapArticle(article));
 
@@ -194,9 +202,18 @@ const addNewArticle = async (req, res) => {
           db.update(articles)
             .set({ blur_image: blurredPath })
             .where(eq(articles.slug, slug))
-            .catch((err) => console.error("Failed to add blur image to db :", err));
+            .catch((err) =>
+              console.error("Failed to add blur image to db :", err),
+            );
         })
-        .catch((err) => console.error("Failed to create blurred image  :    ",slug ,"--------************-------", err));
+        .catch((err) =>
+          console.error(
+            "Failed to create blurred image  :    ",
+            slug,
+            "--------************-------",
+            err,
+          ),
+        );
 
       try {
         // upload the original and replace the stored base64 with the URL
@@ -206,7 +223,11 @@ const addNewArticle = async (req, res) => {
           .set({ image: imageUrl })
           .where(eq(articles.slug, slug));
       } catch (err) {
-        console.error("Failed to save base64 image or update DB:   " ,slug , err);
+        console.error(
+          "Failed to save base64 image or update DB:   ",
+          slug,
+          err,
+        );
         try {
           await db
             .update(articles)
@@ -244,7 +265,6 @@ const addNewArticle = async (req, res) => {
       .set({ categories: JSON.stringify(categoriesValue) })
       .where(eq(articles.slug, slug));
 
-    
     return;
   } catch (error) {
     console.error("Error adding article:", error);

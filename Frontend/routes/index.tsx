@@ -29,6 +29,7 @@ const SubscribeView = lazy(() => import('../components/views/SubscribeView'));
 const CheckoutView = lazy(() => import('../components/views/CheckoutView'));
 const DashboardView = lazy(() => import('../components/dashboard/DashboardView'));
 const ForgotPasswordView = lazy(() => import('../components/ForgotPasswordView'));
+const AcceptInvitation = lazy(()=> import("../components/dashboard/AcceptInvitation"))
 
 /**
  * Suspense wrapper for lazy-loaded components
@@ -93,13 +94,21 @@ const publicRoutes = [
     ),
   },
   {
-    path: PUBLIC_PATHS.FORGOT_PASSWORD,
-    element: (
-      <LazyWrapper>
-        <ForgotPasswordView />
-      </LazyWrapper>
-    ),
+      path: PUBLIC_PATHS.FORGOT_PASSWORD,
+      element: (
+        <LazyWrapper>
+          <ForgotPasswordView />
+        </LazyWrapper>
+      ),
   },
+  {
+    path:PUBLIC_PATHS.ACCEPT_INVITATION,
+    element:(
+      <LazyWrapper>
+        <AcceptInvitation />
+      </LazyWrapper>
+    )
+  }
 ];
 
 /**

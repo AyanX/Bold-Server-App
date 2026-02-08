@@ -1,6 +1,6 @@
 //      /api/settings/profile
 const db = require("../../db/db");
-const { users } = require("../../drizzle/schema");
+const { users, articles } = require("../../drizzle/schema");
 const { eq } = require("drizzle-orm");
 
 const {
@@ -11,7 +11,7 @@ const {
 } = require("../utils");
 
 const uploadProfileImage = async (req, res) => {
-  if (!req.user) {
+  if (!req.user.id) {
     return res.status(401).json({
       status: 401,
       message: "Unauthorized",
@@ -24,10 +24,14 @@ const uploadProfileImage = async (req, res) => {
     //update user's profile image path in database
     await db
       .update(users)
-      .set({ image: path })
-      .where(eq(users.email, req.user.email));
+      .set({ image: publicUrl })
+      .where(eq(users.id, Number(req.user.id)));
 
-    return res.status(200).json({
+    console.log(
+      `User ${req.user.id} profile image updated successfully in database.`,
+    );
+
+    res.status(200).json({
       status: 200,
       message: "Image uploaded successfully",
       data: {
@@ -36,7 +40,20 @@ const uploadProfileImage = async (req, res) => {
         filename: req.file.originalname,
       },
     });
+
+    //update user articles author img in db
+
+      await db.update(articles)
+        .set({ author_image: publicUrl })
+        .where(eq(articles.author_id, Number(req.user.id)));
+
+        console.log(
+          `User ${req.user.name} articles author image updated successfully in database.`,
+        );
+
+    return
   } catch (error) {
+    console.error("Error uploading profile image:", error);
     if (error.message === "Unauthorized") {
       return res.status(401).json({
         status: 401,

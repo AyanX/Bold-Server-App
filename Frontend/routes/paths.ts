@@ -19,6 +19,7 @@ export const PUBLIC_PATHS = {
   SUBSCRIBE: '/subscribe',
   CHECKOUT: '/checkout/:planId',
   FORGOT_PASSWORD: '/forgot-password',
+  ACCEPT_INVITATION:"/accept-invitation"
 } as const;
 
 /**

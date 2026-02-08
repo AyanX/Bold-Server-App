@@ -806,12 +806,12 @@ const DashboardArticles: React.FC<DashboardArticlesProps> = ({
                         >
                           <input
                             type="checkbox"
-                            checked={formData.categories.includes(cat.name.toLowerCase())}
+                            checked={formData.categories.includes(cat.name)}
                             onChange={(e) => {
                               const newCategories = e.target.checked
-                                ? [...formData.categories, cat.name.toLowerCase()]
+                                ? [...formData.categories, cat.name]
                                 : formData.categories.filter(
-                                    (c) => c !== cat.name.toLowerCase(),
+                                    (c) => c !== cat.name,
                                   );
                               setFormData({
                                 ...formData,

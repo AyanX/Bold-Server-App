@@ -19,12 +19,19 @@ const { uploadImageHelper } = require("../utils");
  * Create a new user invitation with OTP
  */
 const inviteUser = async (req, res) => {
-  const { name:invitor = "Ayan", role="Admin" } = req.user;
+  const { name: invitor, role } = req.user;
 
   if (!invitor || !role) {
     return res
       .status(403)
       .json({ message: "forbidden. Login to create a user" });
+  }
+
+  // if user is not admin or manager return forbidden
+  if (role.toLowerCase() !== "admin") {
+    return res
+      .status(403)
+      .json({ message: "forbidden. Only Admins  can create users" });
   }
 
   try {
@@ -65,48 +72,61 @@ const inviteUser = async (req, res) => {
     const otpExpiresAt = getOTPExpirationTime();
     const now = getMySQLDateTime();
 
-    // Insert invitation into database
-    const invitation = await db.insert(userInvitations).values({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      role: role || "Contributor",
-      department: department || null,
-      phone: phone || null,
-      bio: bio || "No bio available.",
-      otpHash: otpHash,
-      otpExpiresAt: otpExpiresAt,
-      invitedBy: `${invitor} ||  ${role}`,
-      image: image || null,
-      createdAt: now,
-      updatedAt: now,
-    });
+    //send email with OTP
+    try {
+      await sendInvitationEmail({
+        email,
+        name,
+        otp,
+        role,
+        inviterName: invitor,
+        department: department || "N/A",
+      });
+    } catch (error) {
+      console.error(`Failed to send invitation email to ${email}:`, error);
+      return res.status(500).json({
+        status: 500,
+        message: "Failed to send invitation email",
+      });
+    }
 
-    //create a pending user record in users table
-    await db.insert(users).values({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      role: role || "Contributor",
-      department: department || null,
-      phone: phone || null,
-      bio: bio || null,
-      status: "Pending",
-      created_at: now,
-      updated_at: now,
-      image: image || null,
-      invited_by: `${invitor} ||  ${role}`,
-      invited_via:"invitation"
+    // Create invitation record in database
+    await db.transaction(async (tx) => {
+      // Insert invitation
+      await tx.insert(userInvitations).values({
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        role: role || "Contributor",
+        department: department || null,
+        phone: phone || null,
+        bio: bio || "No bio available.",
+        otpHash: otpHash,
+        otpExpiresAt: otpExpiresAt,
+        invitedBy: `${invitor} || ${role}`,
+        image: image || null,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Insert pending user
+      await tx.insert(users).values({
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        role: role || "Contributor",
+        department: department || null,
+        phone: phone || null,
+        bio: bio || null,
+        status: "Pending",
+        created_at: now,
+        updated_at: now,
+        image: image || null,
+        invited_by: `${invitor} || ${role}`,
+        invited_via: "invitation",
+      });
     });
 
     console.log(`Invitation created for ${email} with OTP: ${otp}`);
     // Send invitation email
-    await sendInvitationEmail({
-      email,
-      name,
-      otp,
-      role,
-      inviterName: invitor,
-      department: department || "N/A",
-    });
 
     console.log(`User invitation created for ${email}`);
 
@@ -139,9 +159,8 @@ const inviteUser = async (req, res) => {
  */
 const uploadInviteImage = async (req, res) => {
   try {
-
     // Build relative path from uploaded file
-      const { path: relativePath, url: publicUrl } = uploadImageHelper(req,res);
+    const { path: relativePath, url: publicUrl } = uploadImageHelper(req, res);
 
     return res.status(200).json({
       status: 200,
@@ -167,31 +186,20 @@ const uploadInviteImage = async (req, res) => {
  * Accept invitation and create user account
  */
 const acceptInvitation = async (req, res) => {
-
-
-  //   {
   // "email":"xhadyayan@gmail.com",
   // "otp":"888569",
-  // "confirmPassword":"robotic123",
-  // "password":"robotic123"}
-
+  // "password":"robotic123"
+  // linkedin
+  //phoneNumber
 
   try {
-    const { email, otp, password, confirmPassword } = req.body;
+    const { email, otp, password, linkedin, phoneNumber } = req.body;
 
     // Validation
-    if (!email || !otp || !password || !confirmPassword) {
+    if (!email || !otp || !password) {
       return res.status(400).json({
         status: 400,
         message: "Missing required fields: email, otp, password, name",
-      });
-    }
-
-    //
-    if (password !== confirmPassword) {
-      return res.status(400).json({
-        status: 400,
-        message: "Passwords do not match",
       });
     }
 
@@ -202,7 +210,7 @@ const acceptInvitation = async (req, res) => {
       .where(eq(userInvitations.email, email.toLowerCase().trim()))
       .limit(1);
 
-      // if invitation was not found return
+    // if invitation was not found return
     if (invitation.length === 0) {
       return res.status(404).json({
         status: 404,
@@ -230,6 +238,7 @@ const acceptInvitation = async (req, res) => {
 
     // Verify OTP which has been hashed and stored in db
     const isOTPValid = await comparePassword(otp, invitationRecord.otpHash);
+
     if (!isOTPValid) {
       return res.status(401).json({
         status: 401,
@@ -241,33 +250,36 @@ const acceptInvitation = async (req, res) => {
     const hashedPassword = await hashPassword(password);
     const now = getMySQLDateTime();
 
-    // update the user record in users table
+    // update the user record in users table and mark invitation as accepted in user_invitations table in a transaction
+    await db.transaction(async (tx) => {
+      //  Update the user
+      await tx
+        .update(users)
+        .set({
+          password: hashedPassword,
+          status: "Inactive",
+          updated_at: now,
+          invitation_accepted_at: now,
+          email_verified_at: now,
+          linkedin: linkedin || null,
+          phone_number: phoneNumber || null,
+        })
+        .where(
+          and(
+            eq(users.email, email.toLowerCase().trim()),
+            eq(users.status, "Pending"),
+          ),
+        );
 
-    await db
-      .update(users)
-      .set({
-        password: hashedPassword,
-        status: "Inactive",
-        updated_at: now,
-        invitation_accepted_at: now,
-        email_verified_at: now,
-      })
-      .where(
-        and(
-          eq(users.email, email.toLowerCase().trim()),
-          eq(users.status, "Pending"),
-        ),
-      );
-
-    // Update invitation status to accepted
-    await db
-      .update(userInvitations)
-      .set({
-        status: "accepted",
-        updatedAt: now,
-      })
-      .where(eq(userInvitations.id, invitationRecord.id));
-
+      // Update the invitation
+      await tx
+        .update(userInvitations)
+        .set({
+          status: "Accepted",
+          updatedAt: now,
+        })
+        .where(eq(userInvitations.id, invitationRecord.id));
+    });
     console.log(`User ${email} accepted invitation and created account`);
 
     return res.status(201).json({
@@ -276,7 +288,7 @@ const acceptInvitation = async (req, res) => {
       data: {
         email,
         role: invitationRecord.role,
-        status: "active",
+        status: 201,
       },
     });
   } catch (error) {
@@ -472,7 +484,6 @@ const uploadUserImage = async (req, res) => {
       });
     }
 
-    
     const imagePath = `/uploads/users/${id}/${Date.now()}-${req.file.originalname}`;
 
     return res.status(200).json({
@@ -638,7 +649,6 @@ const getUserStatistics = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   inviteUser,

@@ -3,65 +3,42 @@ const { hashPassword } = require("../../utils/bcrypt/bcrypt");
 
 const crypto = require("crypto");
 
-
-
-
-
-
-
 const generateOTP = () => {
   return String(Math.floor(Math.random() * 900000) + 100000);
 };
 
-/**
- * Generate a secure token for invitation links
- * @returns {string} Secure random token
- */
 const generateInvitationToken = () => {
   return crypto.randomBytes(32).toString("hex");
 };
 
-/**
- * Hash OTP code
- * @param {string} otp - OTP to hash
- * @returns {Promise<string>} Hashed OTP
- */
+
 const hashOTP = async (otp) => {
   return await hashPassword(otp);
 };
 
-/**
- * Get MySQL datetime format
- * @returns {string} Current datetime in MySQL format
- */
+
 const getMySQLDateTime = () => {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
 };
 
-/**
- * Calculate OTP expiration time (24 hours from now)
- * @returns {string} Expiration datetime in MySQL format
- */
+
+  // Calculate OTP expiration time (24 hours from now)
+
 const getOTPExpirationTime = () => {
   const expirationDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
   return expirationDate.toISOString().replace("T", " ").slice(0, 19);
 };
 
-/**
- * Validate email format
- * @param {string} email - Email to validate
- * @returns {boolean} True if valid email
- */
+//  * Validate email format
+
 const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-/**
- * Validate password strength
- * @param {string} password - Password to validate
- * @returns {object} { isValid: boolean, errors: string[] }
- */
+
+//  Validate password strength
+
 const validatePassword = (password) => {
   const errors = [];
   
@@ -174,7 +151,7 @@ const sendInvitationEmail = async ({ email, name, otp, role, inviterName = "Admi
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Invitation email sent to ${email}`);
+    console.log(` Invitation email sent to ${email}`);
   } catch (error) {
     console.error(` Failed to send invitation email to ${email}:`, error);
     throw new Error("Failed to send invitation email");

@@ -49,6 +49,44 @@ interface PerformanceMetrics {
   };
 }
 
+type UserInStorage = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  image: string;
+};
+
+
+const getStoredUser = (): UserInStorage | null => {
+  if (typeof window === "undefined") return null;
+
+  const stored = localStorage.getItem("user");
+  if (!stored) return null;
+
+  try {
+    return JSON.parse(stored) as UserInStorage;
+  } catch {
+    return null;
+  }
+};
+
+
+const updateUserImage = (newImage: string): void => {
+  const user = getStoredUser();
+  if (!user) return;
+
+  const updatedUser: UserInStorage = {
+    ...user,
+    image: newImage,
+  };
+
+  localStorage.setItem("user", JSON.stringify(updatedUser));
+};
+
+
+
+
 const DashboardSettings: React.FC<DashboardSettingsProps> = ({
   profileData,
   setProfileData,
@@ -298,8 +336,13 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({
       const res = await api.settings.uploadProfileImage(file);
       if (res.data?.url) {
         setProfileImage(res.data.url);
+
+        // add it to localstorage
+        updateUserImage(res.data.url)
+
       } else if (res.data?.image) {
         setProfileImage(`http://localhost:8000/storage/${res.data.image}`);
+
       }
       setSettingsSaved(true);
       setSaveMessage("Profile image updated!");
