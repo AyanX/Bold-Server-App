@@ -14,10 +14,6 @@ const {
 } = require("./utils.users.management.controller");
 const { uploadImageHelper } = require("../utils");
 
-/**
- * POST /api/users/invite
- * Create a new user invitation with OTP
- */
 const inviteUser = async (req, res) => {
   const { name: invitor, role } = req.user;
 
@@ -59,7 +55,13 @@ const inviteUser = async (req, res) => {
       .where(eq(userInvitations.email, email))
       .limit(1);
 
-    if (existingInvite.length > 0) {
+    // if user with the email already has an invitation and it is still pending return conflict
+    // status can be "suspended" if the invitation was suspended by admin, in that case we should allow to create a new invitation
+    if (
+      existingInvite.length > 0 &&
+      (existingInvite[0].status === "pending" ||
+        existingInvite[0].status === "accepted")
+    ) {
       return res.status(409).json({
         status: 409,
         message: "User with this email has already been invited",
@@ -92,21 +94,45 @@ const inviteUser = async (req, res) => {
 
     // Create invitation record in database
     await db.transaction(async (tx) => {
-      // Insert invitation
-      await tx.insert(userInvitations).values({
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        role: role || "Contributor",
-        department: department || null,
-        phone: phone || null,
-        bio: bio || "No bio available.",
-        otpHash: otpHash,
-        otpExpiresAt: otpExpiresAt,
-        invitedBy: `${invitor} || ${role}`,
-        image: image || null,
-        createdAt: now,
-        updatedAt: now,
-      });
+      // if invitation was suspended, we should update the existing record instead of creating a new one
+      if (
+        existingInvite.length > 0 &&
+        existingInvite[0].status === "suspended"
+      ) {
+        await tx
+          .update(userInvitations)
+          .set({
+            name: name.trim(),
+            role: role || "Contributor",
+            department: department || null,
+            phone: phone || null,
+            bio: bio || "No bio available.",
+            otpHash: otpHash,
+            otpExpiresAt: otpExpiresAt,
+            invitedBy: `${invitor} || ${role}`,
+            image: image || null,
+            status: "pending",
+            updatedAt: now,
+          })
+          .where(eq(userInvitations.id, existingInvite[0].id));
+      } else {
+        //create new invitation
+        // Insert invitation
+        await tx.insert(userInvitations).values({
+          name: name.trim(),
+          email: email.toLowerCase().trim(),
+          role: role || "Contributor",
+          department: department || null,
+          phone: phone || null,
+          bio: bio || "No bio available.",
+          otpHash: otpHash,
+          otpExpiresAt: otpExpiresAt,
+          invitedBy: `${invitor} || ${role}`,
+          image: image || null,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
 
       // Insert pending user
       await tx.insert(users).values({
@@ -134,7 +160,6 @@ const inviteUser = async (req, res) => {
       status: 201,
       message: "Invitation sent successfully",
       data: {
-        id: invitation.insertId,
         email,
         name,
         role,
@@ -151,12 +176,6 @@ const inviteUser = async (req, res) => {
   }
 };
 
-/**
- * POST /api/users/invite/image
- * Upload image during invitation process
- *
- * Request: multipart/form-data with image file only
- */
 const uploadInviteImage = async (req, res) => {
   try {
     // Build relative path from uploaded file
@@ -181,10 +200,6 @@ const uploadInviteImage = async (req, res) => {
   }
 };
 
-/**
- * POST /api/users/accept-invitation
- * Accept invitation and create user account
- */
 const acceptInvitation = async (req, res) => {
   // "email":"xhadyayan@gmail.com",
   // "otp":"888569",
@@ -275,7 +290,7 @@ const acceptInvitation = async (req, res) => {
       await tx
         .update(userInvitations)
         .set({
-          status: "Accepted",
+          status: "accepted",
           updatedAt: now,
         })
         .where(eq(userInvitations.id, invitationRecord.id));
@@ -300,10 +315,6 @@ const acceptInvitation = async (req, res) => {
   }
 };
 
-/**
- * GET /api/users/invitations/list
- * Get list of all invitations (with optional filters)
- */
 const getInvitationsList = async (req, res) => {
   try {
     const { status, role, search } = req.query;
@@ -336,10 +347,6 @@ const getInvitationsList = async (req, res) => {
   }
 };
 
-/**
- * POST /api/users/invitations/:id/resend
- * Resend invitation email with new OTP
- */
 const resendInvitation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -420,10 +427,6 @@ const resendInvitation = async (req, res) => {
   }
 };
 
-/**
- * DELETE /api/users/invitations/:id
- * Delete/cancel an invitation
- */
 const deleteInvitation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -454,7 +457,7 @@ const deleteInvitation = async (req, res) => {
       .delete(userInvitations)
       .where(eq(userInvitations.id, parseInt(id)));
 
-    console.log(`🗑️ Invitation ${id} deleted`);
+    console.log(` Invitation ${id} deleted`);
 
     return res.status(200).json({
       status: 200,
@@ -469,11 +472,10 @@ const deleteInvitation = async (req, res) => {
   }
 };
 
-/**
- * POST /api/users/:id/image
- * Upload user profile image
- */
 const uploadUserImage = async (req, res) => {
+
+
+
   try {
     const { id } = req.params;
 
@@ -483,14 +485,24 @@ const uploadUserImage = async (req, res) => {
         message: "No image file provided",
       });
     }
+    // Build relative path from uploaded file
+    const { path: imagePath, url: publicUrl } = uploadImageHelper(req, res);
 
-    const imagePath = `/uploads/users/${id}/${Date.now()}-${req.file.originalname}`;
+    // Update user's image path in database
+    await db
+      .update(users)
+      .set({
+        image: publicUrl,
+        updated_at: getMySQLDateTime(),
+      })
+      .where(eq(users.id, Number(id)));
+
 
     return res.status(200).json({
       status: 200,
       message: "Image uploaded successfully",
       data: {
-        url: imagePath,
+        url: publicUrl,
         path: imagePath,
         filename: req.file.originalname,
       },
@@ -504,10 +516,6 @@ const uploadUserImage = async (req, res) => {
   }
 };
 
-/**
- * PATCH /api/users/:id/status
- * Update user status
- */
 const updateUserStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -554,10 +562,6 @@ const updateUserStatus = async (req, res) => {
   }
 };
 
-/**
- * POST /api/users/bulk-status
- * Update status for multiple users
- */
 const bulkUpdateUserStatus = async (req, res) => {
   try {
     const { user_ids, status } = req.body;
@@ -607,10 +611,6 @@ const bulkUpdateUserStatus = async (req, res) => {
   }
 };
 
-/**
- * GET /api/users/statistics/overview
- * Get user statistics
- */
 const getUserStatistics = async (req, res) => {
   try {
     const allUsers = await db.select().from(users);

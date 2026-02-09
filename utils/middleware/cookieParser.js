@@ -1,30 +1,112 @@
 //attach req user from cookie token
-const { verifyToken } = require("../../utils/jwt/jwt");
+const {
+  verifyToken,
+  verifyRefreshToken,
+  generateToken,
+} = require("../../utils/jwt/jwt");
+const { TokenExpiredError } = require("jsonwebtoken");
+const { refreshTokens,users } = require("../../drizzle/schema");
+const db = require("../../db/db");
+const { eq } = require("drizzle-orm");
 
-const cookieParserMiddleware = (req, res, next) => {
-  const token = req?.cookies?.token;
+  const HandleRefresh = async (req,res,next) => {
+    const refreshToken = req.cookies.refreshToken;
 
-  if (!token) {
-    req.user={};
-    return next();
-  }
+    if (!refreshToken) {
+      req.user = {
+        id: null,
+        email: null,
+        name: null,
+        role: null,
+        image: null,
+      }
+      // No user if no refresh token
+      return next(); // No refresh token, proceed without user  
+    }
+
+    try {
+      const refreshPayload = verifyRefreshToken(refreshToken);
+      //returns id and email from refresh token payload
+
+      const { id, email } = refreshPayload;
+
+      // Check DB
+      const stored = await db
+        .select()
+        .from(refreshTokens)
+        .where(eq(refreshTokens.userId, Number(id)))
+        .limit(1);
+
+      if (!stored) {
+        return res.status(403).json({ message: "Refresh revoked" });
+      }
+
+      const storedUserId = stored[0].userId;
+
+      const userInDb = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, storedUserId))
+        .limit(1);
+
+      if (userInDb.length === 0) {
+        return res.status(403).json({ message: "User not found in database" });
+      }
+
+      // Create new access token
+      const newAccessToken = generateToken({
+        id: userInDb[0].id,
+        email: userInDb[0].email,
+        name: userInDb[0].name,
+        role: userInDb[0].role,
+        image: userInDb[0].image,
+      });
+
+      // Set cookie immediately
+      res.cookie("token", newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 15 * 60 * 1000,
+      });
+
+      // Attach user & continue
+      req.user = {
+        id: userInDb[0].id,
+        email: userInDb[0].email,
+        name: userInDb[0].name,
+        role: userInDb[0].role,
+        image: userInDb[0].image,
+      };
+      next();
+    } catch(err) {
+      console.log("Invalid refresh token", err);
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
+  };
+
+const cookieParserMiddleware = async (req, res, next) => {
+  const accessToken = req.cookies?.token;
+
   try {
-    const decoded = verifyToken(token);
-    req.user = decoded;
-//     {
-//   id: 5,
-//   role: 'Admin',
-//   email: 'xhadyayan11@gmail.com',
-//   iat: 1769799010,
-//   exp: 1769802610,
- //     name:xyz
-// }
+    // Try access token first
+    const payload = verifyToken(accessToken);
 
-   return next();
-  } catch (error) {
-    console.error("Cookie parsing error:", error.message);
+    req.user = payload;
     return next();
+  } catch (err) {
+    // Only handle expiration errors here, other errors should fail immediately
+    if (!(err instanceof TokenExpiredError)) {
+      console.log("Expired Token:", err.message);
+        // ACCESS TOKEN EXPIRED → TRY REFRESH TOKEN
+      HandleRefresh(req,res,next);
+    }
   }
+
+
+
 };
+
+
 
 module.exports = cookieParserMiddleware;

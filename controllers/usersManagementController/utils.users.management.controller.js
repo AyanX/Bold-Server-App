@@ -65,91 +65,62 @@ const validatePassword = (password) => {
 };
 
 /**
- * Send invitation email with OTP
- * @param {object} params - Email parameters
- * @returns {Promise<void>}
+ * Send invitation email with OTP and instructions to the new user
  */
 const sendInvitationEmail = async ({ email, name, otp, role, inviterName = "Admin", department = "N/A" }) => {
   try {
-    // const mailOptions = {
-    //   from: "The Bold East Africa <noreply@theboldeastafrica.com>",
-    //   to: email,
-    //   subject: "You're Invited to Join The Bold East Africa Platform",
-    //   html: `
-    //     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-    //       <!-- Gradient Header -->
-    //       <div style="background: linear-gradient(135deg, #007bff, #0056b3); padding: 20px; text-align: center; color: white;">
-    //         <h1 style="margin: 0; font-size: 24px;">Welcome to The Bold East Africa</h1>
-    //       </div>
-    //       <div style="padding: 20px;">
-    //         <p>Dear <strong>${name}</strong>,</p>
-    //         <p>Welcome to The Bold East Africa! You've been invited to join our platform as an <strong>${role}</strong>.</p>
-            
-    //         <h3 style="color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Your Invitation Details:</h3>
-    //         <ul style="list-style: none; padding: 0;">
-    //           <li><strong>Email:</strong> ${email}</li>
-    //           <li><strong>Role:</strong> ${role}</li>
-    //           <li><strong>Department:</strong> ${department}</li>
-    //         </ul>
-            
-    //         <p>To complete your account setup, please use the following One-Time Password (OTP):</p>
-    //         <div style="background-color: #f8f9fa; padding: 15px; margin: 20px 0; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
-    //           <p style="margin: 0; color: #666; font-size: 14px;">Your OTP Code:</p>
-    //           <p style="margin: 10px 0; font-size: 32px; font-weight: bold; color: #007bff; letter-spacing: 2px;">${otp}</p>
-    //           <p style="margin: 0; color: #666; font-size: 12px;">This code expires in 24 hours. For security, do not share it with anyone.</p>
-    //         </div>
-            
-    //         <h3 style="color: #333;">Next Steps:</h3>
-    //         <ol>
-    //           <li>Visit our platform at <a href="https://theboldeastafrica.com/accept-invitation" style="color: #007bff;">https://theboldeastafrica.com/accept-invitation</a></li>
-    //           <li>Enter your email, the OTP above, and create a new password (minimum 8 characters).</li>
-    //           <li>Submit the form to activate your account.</li>
-    //         </ol>
-            
-    //         <p>If you have any questions, contact your admin or <a href="mailto:support@theboldeastafrica.com" style="color: #007bff;">support@theboldeastafrica.com</a>.</p>
-            
-    //         <p>Best regards,<br>The Bold East Africa Team</p>
-    //       </div>
-    //       <!-- Footer -->
-    //       <div style="background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd;">
-    //         <p style="margin: 0;">
-    //           <a href="https://theboldeastafrica.com" style="color: #007bff; text-decoration: none;">Visit our website</a> | 
-    //           <a href="mailto:support@theboldeastafrica.com" style="color: #007bff; text-decoration: none;">Contact Support</a>
-    //         </p>
-    //         <p style="margin: 5px 0 0;">&copy; ${new Date().getFullYear()} The Bold East Africa. All rights reserved.</p>
-    //       </div>
-    //     </div>
-    //   `,
-    // };
-
     const mailOptions = {
-      from: "The Bold East Africa <support@theboldeastafrica.com>",
-        to: email,
-        subject: "You're Invited to Join The Bold East Africa Platform",
-        text: `Dear ${name}`,
-        html : `Welcome to The Bold East Africa! You've been invited to join our platform as an ${role}.
-
-        Your Invitation Details:
-        Email: ${email}
-        Role: ${role}
-        Department: ${department}
-
-        To complete your account setup, please use the following One-Time Password (OTP):
-
-        Your OTP Code: ${otp}
-
-        This code expires in 24 hours. For security, do not share it with anyone.
-
-        Next Steps:
-        1. Visit our platform at https://theboldeastafrica.com/accept-invitation
-        2. Enter your email, the OTP above, and create a new password (minimum 8 characters).
-        3. Submit the form to activate your account.
-
-        If you have any questions, contact your admin or <a href="mailto:support@theboldeastafrica.com" style="color: #007bff;">support@theboldeastafrica.com</a>.
-        Best regards,
-        The Bold East Africa Team`,
+      from: "The Bold East Africa <noreply@theboldeastafrica.com>",
+      to: email,
+      subject: "You're Invited to Join The Bold East Africa Platform",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+          <!-- Gradient Header -->
+          <div style="background: linear-gradient(135deg, #007bff, #0056b3); padding: 20px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 24px;">Welcome to The Bold East Africa</h1>
+          </div>
+          <div style="padding: 20px;">
+            <p>Dear <strong>${name}</strong>,</p>
+            <p>Welcome to The Bold East Africa! You've been invited to join our platform as an <strong>${role}</strong>.</p>
+            
+            <h3 style="color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Your Invitation Details:</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li><strong>Email:</strong> ${email}</li>
+              <li><strong>Role:</strong> ${role}</li>
+              <li><strong>Department:</strong> ${department}</li>
+            </ul>
+            
+            <p>To complete your account setup, please use the following One-Time Password (OTP):</p>
+            <div style="background-color: #f8f9fa; padding: 15px; margin: 20px 0; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
+              <p style="margin: 0; color: #666; font-size: 14px;">Your OTP Code:</p>
+              <p style="margin: 10px 0; font-size: 32px; font-weight: bold; color: #007bff; letter-spacing: 2px;">${otp}</p>
+              <p style="margin: 0; color: #666; font-size: 12px;">This code expires in 24 hours. For security, do not share it with anyone.</p>
+            </div>
+            
+            <h3 style="color: #333;">Next Steps:</h3>
+            <ol>
+              <li>Visit our platform at <a href="https://theboldeastafrica.com/accept-invitation" style="color: #007bff;">https://theboldeastafrica.com/accept-invitation</a></li>
+              <li>Enter your email, the OTP above, and create a new password (minimum 8 characters).</li>
+              <li>Submit the form to activate your account.</li>
+            </ol>
+            
+            <p>If you have any questions, contact your admin or <a href="mailto:support@theboldeastafrica.com" style="color: #007bff;">support@theboldeastafrica.com</a>.</p>
+            
+            <p>Best regards,<br>The Bold East Africa Team</p>
+          </div>
+          <!-- Footer -->
+          <div style="background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd;">
+            <p style="margin: 0;">
+              <a href="https://theboldeastafrica.com" style="color: #007bff; text-decoration: none;">Visit our website</a> | 
+              <a href="mailto:support@theboldeastafrica.com" style="color: #007bff; text-decoration: none;">Contact Support</a>
+            </p>
+            <p style="margin: 5px 0 0;">&copy; ${new Date().getFullYear()} The Bold East Africa. All rights reserved.</p>
+          </div>
+        </div>
+      `,
     };
 
+  
     await transporter.sendMail(mailOptions);
     console.log(` Invitation email sent to ${email}`);
   } catch (error) {

@@ -4,8 +4,8 @@ const path = require("path");
 const axios = require("axios");
 
 
-const getMySQLDateTime = () => {
-  return new Date().toISOString().replace("T", " ").slice(0, 19);
+const getMySQLDateTime = (date = new Date()) => {
+  return date.toISOString().replace("T", " ").slice(0, 19);
 };
 
 const uploadImageHelper = (req, res) => {

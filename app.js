@@ -27,19 +27,25 @@ app.use(
     credentials: true,
   }),
 );
-
+app.use(cookieParser());
 app.set('trust proxy', true);
 
 //set a users ip in req.clientIp
 app.use(requestIp.mw());
 
-app.use(cookieParser());
+
 
 // Serve static files from public directory (for uploads)
 app.use("/storage", express.static("./public/storage"));
 
+
+//auth router
+app.use(authRouter);
+
+
 //ATTACH USER FROM COOKIE TOKEN
 app.use(cookieParserMiddleware);
+
 
 // Home route
 app.get("/", (req, res) => {
@@ -102,7 +108,6 @@ app.get("/api/settings/performance", (req, res) => {
   res.json({ message: "api working" });
 });
 
-//auth router
-app.use(authRouter);
+
 
 module.exports = app;

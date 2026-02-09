@@ -1,4 +1,4 @@
-const { users } = require("../../drizzle/schema");
+const { users, userInvitations } = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq, like } = require("drizzle-orm");
 const crypto = require("crypto");
@@ -10,10 +10,6 @@ const getMySQLDateTime = () => {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
 };
 
-/**
- * GET /api/users
- * Fetch all users with optional search
- */
 const getAllUsers = async (req, res) => {
   try {
     const { search } = req.query;
@@ -38,107 +34,8 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-/**
- * POST /api/users
- * Create a new user
- */
-const createUser = async (req, res) => {
-  // if not admin => return
-  if (req.user.role !== "Admin") {
-    return res.status(403).json({
-      message: "Forbidden: Only admins can create users",
-      status: 403,
-    });
-  }
-  //invited users handled here
-  try {
-    const { name, email, linkedin, role, bio, image } = req.body;
 
-    // Validate required fields
-    if (!name || name.trim().length === 0) {
-      return res.status(422).json({
-        message: "Validation failed",
-        status: 422,
-        errors: { name: ["The name field is required."] },
-      });
-    }
 
-    if (!email || email.trim().length === 0) {
-      return res.status(422).json({
-        message: "Validation failed",
-        status: 422,
-        errors: { email: ["The email field is required."] },
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(422).json({
-        message: "Validation failed",
-        status: 422,
-        errors: { email: ["The email must be a valid email address."] },
-      });
-    }
-
-    // Check if email already exists
-    const existingUser = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email.toLowerCase()))
-      .limit(1);
-
-    //email exists => return
-    if (existingUser.length > 0) {
-      return res.status(422).json({
-        message: "Validation failed",
-        status: 422,
-        errors: { email: ["This email is already registered."] },
-      });
-    }
-
-    // Insert new user
-    const now = getMySQLDateTime();
-
-    await db.insert(users).values({
-      name: name.trim(),
-      email: email.toLowerCase(),
-      role: role || "Contributor",
-      status: "Pending",
-      bio: bio || null,
-      image: image || null,
-      linkedin: linkedin || null,
-      created_at: now,
-      updated_at: now,
-    });
-
-    // Fetch created user (without password)
-    const newUser = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email.toLowerCase()))
-      .limit(1);
-
-    const newUserData = safeUser(newUser[0]);
-
-    return res.status(201).json({
-      data: newUserData,
-      message: "User created successfully",
-      status: 201,
-    });
-  } catch (error) {
-    console.error("Error creating user:", error);
-    res.status(500).json({
-      message: "Internal server error",
-      status: 500,
-    });
-  }
-};
-
-/**
- * GET /api/users/:id
- * Fetch a single user by ID
- */
 const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -181,10 +78,8 @@ const getUserById = async (req, res) => {
   }
 };
 
-/**
- * PUT /api/users/:id
- * Update a user by ID
- */
+
+
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -327,24 +222,32 @@ const updateUser = async (req, res) => {
   }
 };
 
-/**
- * DELETE /api/users/:id
- * Delete a user by ID
- */
+
 const deleteUser = async (req, res) => {
-  const { id: adminId } = req.user.id; // ID of the user making the request
+  const { id: adminId } = req.user; // ID of the user making the request
+
+  if(!adminId) {
+    console.log("Unauthorized delete attempt: No user ID in request");
+    return res.status(401).json({
+      message: "Unauthorized: User ID not found in request",
+      status: 401,
+    });
+  }
+
 
   try {
     const { id } = req.params;
 
     // check if request was sent by an admin
 
-    if (req.user.role !== "Admin") {
+    if (req.user.role.toLowerCase() !== "admin") {
       return res.status(403).json({
         message: "Forbidden: Only admins can delete users",
         status: 403,
       });
     }
+
+    console.log("Delete user request by admin ID:", adminId); // Debug log
 
     // confirm user role before deletion to prevent unauthorized deletions
     const userRole = await db
@@ -353,7 +256,9 @@ const deleteUser = async (req, res) => {
       .where(eq(users.id, Number(adminId)))
       .limit(1);
 
-    if (userRole.length === 0 || userRole[0].role !== "Admin") {
+      console.log("User role for deletion attempt by:", userRole[0].role); // Debug log
+
+    if (userRole.length === 0 || userRole[0].role.toLowerCase() !== "admin") {
       return res.status(403).json({
         message: "Forbidden: Only admins can delete users",
         status: 403,
@@ -375,6 +280,8 @@ const deleteUser = async (req, res) => {
       .where(eq(users.id, Number(id)))
       .limit(1);
 
+    console.log("Existing user for deletion:", existingUser[0]); 
+
     if (existingUser.length === 0) {
       return res.status(404).json({
         message: "User not found",
@@ -384,6 +291,13 @@ const deleteUser = async (req, res) => {
 
     // Delete user
     await db.delete(users).where(eq(users.id, Number(id)));
+
+
+    //change invitation status to suspended if the user is deleted
+    await db
+      .update(userInvitations)
+      .set({ status: "suspended" })
+      .where(eq(userInvitations.id, existingUser[0].id));
 
     return res.status(200).json({
       message: "User deleted successfully",
@@ -400,7 +314,6 @@ const deleteUser = async (req, res) => {
 
 module.exports = {
   getAllUsers,
-  createUser,
   getUserById,
   updateUser,
   deleteUser,

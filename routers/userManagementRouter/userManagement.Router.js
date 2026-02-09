@@ -26,7 +26,7 @@ userManagementRouter.post("/invitations/:id/resend", resendInvitation);
 userManagementRouter.delete("/invitations/:id", deleteInvitation);
 
 // User management routes
-userManagementRouter.post("/:id/image", uploadUserImage);
+userManagementRouter.post("/:id/image", upload.single('image'), uploadUserImage);
 userManagementRouter.patch("/:id/status", updateUserStatus);
 userManagementRouter.post("/bulk-status", bulkUpdateUserStatus);
 

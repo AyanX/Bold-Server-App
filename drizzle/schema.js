@@ -333,12 +333,41 @@ const users = mysqlTable(
   ],
 );
 
+
+const refreshTokens = mysqlTable(
+  "refresh_tokens",
+  {
+    id: bigint("id", { mode: "number", unsigned: true })
+      .autoincrement()
+      .notNull(),
+
+    userId: bigint("user_id", { mode: "number", unsigned: true })
+      .notNull(),
+
+    // HASHED refresh token
+    tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+
+    // expiration
+    expiresAt: timestamp("expires_at", { mode: "string" }).notNull(),
+    // rotation / revocation
+    revokedAt: timestamp("revoked_at", { mode: "string" }),
+    createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index("refresh_tokens_user_id_idx").on(table.userId),
+    index("refresh_tokens_token_hash_idx").on(table.tokenHash),
+  ],
+);
+
 module.exports = {
   activityLogs,
   articles,
   campaigns,
+  refreshTokens,
   categories,
   jobBatches,
+  refreshTokens,
   jobs,
   migrations,
   pageViews,
