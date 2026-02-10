@@ -487,11 +487,39 @@ const updateArticleById = async (req, res) => {
       })
       .where(eq(users.id, existingArticle[0].author_id));
 
-    return res.status(200).json({
+    // send the updated article as response
+   res.status(200).json({
       data: mappedArticle,
       message: "Article updated successfully",
       status: 200,
     });
+  // update the new categories with the article slug for better frontend filtering
+  // . find added categories not in old categories and attach the article slug to them
+    for (const cat of categoriesValue) {
+      if (!oldCategories.includes(cat)) {
+        // this is a new category added in the update, attach the article slug to it
+        const categoryRow = await db
+          .select()
+          .from(categoriesDb)
+          .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`)
+          .limit(1);
+
+        if(categoryRow.length < 1) {
+          return
+        }
+        // the slug
+        const categorySlug = categoryRow[0].slug;
+        // check if slug is in categoriesValue, if not add it and update the article record
+
+        if (!categoriesValue.includes(categorySlug)) {
+          categoriesValue.push(categorySlug);
+          await db
+            .update(articles)
+            .set({ categories: JSON.stringify(categoriesValue) })
+            .where(eq(articles.id, Number(id)));
+        }
+      }
+    }
   } catch (error) {
     console.error("Error updating article:", error);
     res.status(500).json({ error: "Internal server error" });

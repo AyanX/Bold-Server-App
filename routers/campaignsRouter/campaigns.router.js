@@ -1,24 +1,25 @@
 const express = require('express');
+const AuthCheck = require('../../utils/authCheck/authCheck');
 
 const campaignsRouter = express.Router();
 
-campaignsRouter.get("/", (req, res) => {
+campaignsRouter.get("/", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 
-campaignsRouter.post("/", (req, res) => {
+campaignsRouter.post("/", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 
-campaignsRouter.get("/:id", (req, res) => {
+campaignsRouter.get("/:id", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 
-campaignsRouter.put("/:id", (req, res) => {
+campaignsRouter.put("/:id", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 
-campaignsRouter.delete("/:id", (req, res) => {
+campaignsRouter.delete("/:id", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 

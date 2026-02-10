@@ -1,5 +1,6 @@
 const express = require('express');
 const upload = require('../../utils/middleware/multer');
+const AuthCheck = require('../../utils/authCheck/authCheck');
 const {
     inviteUser,
     uploadInviteImage,
@@ -19,18 +20,18 @@ const userManagementRouter = express.Router();
 
 // Invitation routes
 // userManagementRouter.post("/invite", inviteUser);
-userManagementRouter.post("/invite/image", upload.single('image'), uploadInviteImage);
+userManagementRouter.post("/invite/image", AuthCheck, upload.single('image'), uploadInviteImage);
 userManagementRouter.post("/accept-invitation", acceptInvitation);
-userManagementRouter.get("/invitations/list", getInvitationsList);
-userManagementRouter.post("/invitations/:id/resend", resendInvitation);
-userManagementRouter.delete("/invitations/:id", deleteInvitation);
+userManagementRouter.get("/invitations/list", AuthCheck, getInvitationsList);
+userManagementRouter.post("/invitations/:id/resend", AuthCheck, resendInvitation);
+userManagementRouter.delete("/invitations/:id", AuthCheck, deleteInvitation);
 
 // User management routes
-userManagementRouter.post("/:id/image", upload.single('image'), uploadUserImage);
-userManagementRouter.patch("/:id/status", updateUserStatus);
-userManagementRouter.post("/bulk-status", bulkUpdateUserStatus);
+userManagementRouter.post("/:id/image", AuthCheck, upload.single('image'), uploadUserImage);
+userManagementRouter.patch("/:id/status", AuthCheck, updateUserStatus);
+userManagementRouter.post("/bulk-status", AuthCheck, bulkUpdateUserStatus);
 
 // Statistics route
-userManagementRouter.get("/statistics/overview", getUserStatistics);
+userManagementRouter.get("/statistics/overview", AuthCheck, getUserStatistics);
 
 module.exports = userManagementRouter;

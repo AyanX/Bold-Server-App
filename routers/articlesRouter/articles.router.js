@@ -9,19 +9,19 @@ const {
   trackView,
   trackClick,
 } = require("../../controllers/articlesController/articles.controller");
-
+const AuthCheck = require("../../utils/authCheck/authCheck");
 
 const articlesRouter = express.Router();
 
 articlesRouter.get("/", getAllArticles);
 
-articlesRouter.post("/", addNewArticle);
+articlesRouter.post("/", AuthCheck, addNewArticle);
 
 articlesRouter.get("/:identifier", getArticleByIdOrSlug);
 
-articlesRouter.put("/:id", updateArticleById);
+articlesRouter.put("/:id", AuthCheck, updateArticleById);
 
-articlesRouter.delete("/:id", deleteArticleById);
+articlesRouter.delete("/:id", AuthCheck, deleteArticleById);
 
 
 articlesRouter.post("/:id/view", trackView);

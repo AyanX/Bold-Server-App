@@ -1,13 +1,19 @@
 // api/settings
 
 const express = require('express');
-const { getSettings,putSettings,passwordUpdate, getSystemStats ,sideBarCollapsed} = require('../../controllers/settingsController/settings.controller');
+const { articleSettings,getSettings,putSettings,passwordUpdate, getSystemStats ,sideBarCollapsed} = require('../../controllers/settingsController/settings.controller');
+const AuthCheck = require('../../utils/authCheck/authCheck');
 
 const settingsRouter = express.Router();
 
-settingsRouter.get("/",getSettings)
-settingsRouter.get("/sidebar-collapsed", sideBarCollapsed)
-settingsRouter.get("/theme", (req, res) => {
+settingsRouter.get("/", AuthCheck, getSettings)
+settingsRouter.get("/sidebar-collapsed", AuthCheck, sideBarCollapsed)
+
+settingsRouter.get("/article-settings", articleSettings)
+
+
+
+settingsRouter.get("/theme", AuthCheck, (req, res) => {
         const data= {
         mode: "dark",
         primaryColor: "#e3ab10",
@@ -17,26 +23,26 @@ settingsRouter.get("/theme", (req, res) => {
     
 })
 
-settingsRouter.get("/group/:group", (req, res) => {
+settingsRouter.get("/group/:group", AuthCheck, (req, res) => {
 res.json({ message: "api working" })
 })
-settingsRouter.put("/", putSettings)
+settingsRouter.put("/", AuthCheck, putSettings)
 
-settingsRouter.put("/:key",putSettings)
+settingsRouter.put("/:key", AuthCheck, putSettings)
 
-settingsRouter.post("/password", passwordUpdate)
+settingsRouter.post("/password", AuthCheck, passwordUpdate)
 
-settingsRouter.get("/export", (req, res) => {
+settingsRouter.get("/export", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 
-settingsRouter.get("/system-stats", getSystemStats)
+settingsRouter.get("/system-stats", AuthCheck, getSystemStats)
 
-settingsRouter.post("/clear-cache", (req, res) => {
+settingsRouter.post("/clear-cache", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 
-settingsRouter.post("/reset/:group", (req, res) => {
+settingsRouter.post("/reset/:group", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 

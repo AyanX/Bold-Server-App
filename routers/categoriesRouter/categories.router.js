@@ -7,6 +7,7 @@ const {
   deleteCategory,
 } = require('../../controllers/categoriesController/categories.controller');
 const { getArticlesByCategory } = require('../../controllers/articlesController/articles.controller');
+const AuthCheck = require('../../utils/authCheck/authCheck');
 
 const categoriesRouter = express.Router();
 
@@ -18,15 +19,15 @@ categoriesRouter.get("/:category", getArticlesByCategory);
 categoriesRouter.get("/category/:category", getArticlesByCategory);
 
 // POST create a new category
-categoriesRouter.post("/", createCategory);
+categoriesRouter.post("/", AuthCheck, createCategory);
 
 // GET single category by ID
 categoriesRouter.get("/:id", getCategoryById);
 
 // PUT/PATCH update category
-categoriesRouter.put("/:id", updateCategory);
+categoriesRouter.put("/:id", AuthCheck, updateCategory);
 
 // DELETE category
-categoriesRouter.delete("/:id", deleteCategory);
+categoriesRouter.delete("/:id", AuthCheck, deleteCategory);
 
 module.exports = categoriesRouter;

@@ -377,6 +377,10 @@ export const api = {
       return request<any>("/settings/sidebar-collapsed", {}, true);
     },
 
+    async getArticleSettings(){
+      return request<any>("/settings/article-settings", {}, true);
+    },
+
 
     async getByGroup(group: string) {
       return request<any>(`/settings/group/${group}`, {}, true);

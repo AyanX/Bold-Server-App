@@ -130,10 +130,10 @@ await db.transaction(async (tx) => {
 
 const logout = async (req, res) => {
   console.log("Logout request received");
-  const { email } = req.user;
+  const { id } = req.user;
 
   // if a user is not authenticated
-  if (!email) {
+  if (!id) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -144,8 +144,12 @@ const logout = async (req, res) => {
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email.toLowerCase()))
+      .where(eq(users.id, Number(id) ))
       .limit(1);
+
+      if(!user){
+        return res.status(404).json({ message: "User not found" });
+      }
 
     //update users last_active
     await db
@@ -154,11 +158,13 @@ const logout = async (req, res) => {
         last_active: now,
         status: "Inactive",
       })
-      .where(eq(users.id, user.id));
+      .where(eq(users.id, Number(id)));
+
 
     // Clear the token cookie
 
-    console.log("Logging out user:", email);
+    console.log("Clearing cookies for user ID:", id); 
+
     res.clearCookie("token", {
       httpOnly: true,
       sameSite: "Lax",

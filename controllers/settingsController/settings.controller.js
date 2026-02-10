@@ -246,7 +246,7 @@ const sideBarCollapsed = async (req, res) => {
       status: 200,
       message: "Sidebar collapsed state fetched successfully",
       data: {
-        collapsed: collapsedBool,
+        collapsed: !collapsedBool,
       },
     });
   } catch (error) {
@@ -259,10 +259,32 @@ const sideBarCollapsed = async (req, res) => {
   }
 }
 
+const articleSettings = async( req,res)=>{
+  try {
+    const default_status = await db.select().from(settings).where(eq(settings.key, "default_article_status"));
+  const require_featured_image = await db.select().from(settings).where(eq(settings.key, "require_featured_image"));
+
+  const isImageRequired =  require_featured_image[0].value === true || require_featured_image[0].value === 'true' || require_featured_image[0].value=== '1';
+  return res.status(200).json({
+    data:{
+      default_status:default_status[0].value,
+      require_featured_image: isImageRequired
+    }
+  })
+
+
+  } catch (error) {
+    
+  }
+
+
+
+}
 
 
 module.exports = {
   getSettings,
+  articleSettings,
   getSystemStats,
   putSettings,
   passwordUpdate,

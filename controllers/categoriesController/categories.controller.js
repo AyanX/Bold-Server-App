@@ -3,10 +3,6 @@ const db = require("../../db/db");
 const { eq, like, sql } = require("drizzle-orm");
 const { capitalizeFirstLetter } = require("../utils");
 
-/**
- * GET /api/categories
- * Fetch all categories with optional search filter
- */
 const getAllCategories = async (req, res) => {
   try {
     const { search } = req.query;
@@ -16,7 +12,7 @@ const getAllCategories = async (req, res) => {
     if (search && search.trim()) {
       query = query.where(like(categories.name, `%${search.trim()}%`));
     }
-    
+
     const allCategories = await query;
     return res.status(200).json({
       data: allCategories,
@@ -33,10 +29,6 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-/**
- * POST /api/categories
- * Create a new category
- */
 const createCategory = async (req, res) => {
   try {
     const { name, slug, color, article_count } = req.body;
@@ -103,14 +95,13 @@ const createCategory = async (req, res) => {
     }
 
     // Insert new category
-    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
 
-    //  TRANSFORM THE NEW CATEGORY NAME TO USE FIRST LETTERS AS CAPITAL WORDS 
+    //  TRANSFORM THE NEW CATEGORY NAME TO USE FIRST LETTERS AS CAPITAL WORDS
 
     const formattedName = capitalizeFirstLetter(name);
 
-
-     await db.insert(categories).values({
+    await db.insert(categories).values({
       name: formattedName,
       slug: slug.trim().toLowerCase(),
       color: categoryColor,
@@ -141,10 +132,6 @@ const createCategory = async (req, res) => {
   }
 };
 
-/**
- * GET /api/categories/:id
- * Fetch a single category by ID
- */
 const getCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -186,14 +173,10 @@ const getCategoryById = async (req, res) => {
   }
 };
 
-/**
- * PUT /api/categories/:id
- * Update a category by ID
- */
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, slug, color, article_count } = req.body;
+    const { name, slug, color, description } = req.body;
 
     // Validate ID
     if (!id || isNaN(Number(id))) {
@@ -284,22 +267,15 @@ const updateCategory = async (req, res) => {
       updateData.color = color;
     }
 
-    // Add articleCount if provided
-    if (article_count !== undefined) {
-      if (typeof article_count !== "number" || article_count < 0) {
-        return res.status(422).json({
-          message: "Validation failed",
-          status: 422,
-          errors: {
-            article_count: ["The article_count must be a non-negative number."],
-          },
-        });
-      }
-      updateData.articleCount = article_count;
+    if (description !== undefined) {
+      updateData.description = description.trim();
     }
 
     // Always update the updatedAt timestamp
-    updateData.updatedAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    updateData.updatedAt = new Date()
+      .toISOString()
+      .replace("T", " ")
+      .slice(0, 19);
 
     // Update category
     await db
@@ -314,15 +290,49 @@ const updateCategory = async (req, res) => {
       .where(eq(categories.id, Number(id)))
       .limit(1);
 
-    console.log(`✏️ Category updated:`, updatedCategory[0]);
-
-    return res.status(200).json({
+    res.status(200).json({
       data: updatedCategory[0],
       message: "Category updated successfully",
       status: 200,
     });
+
+    // if the slug was changed, update the slugs of all articles that belong to this category
+
+    if (
+      existingCategory[0].slug !== updateData.slug &&
+      updateData.slug !== undefined
+    ) {
+    }
+    // for each articles, get categories, parse them, find the category with the old slug, replace it with the new slug, then update the article with the new categories
+
+    const articlesToUpdate = await db
+      .select()
+      .from(articles)
+      .where(
+        like(
+          articles.categories,
+          `%${existingCategory[0].slug.toLowerCase()}%`,
+        ),
+      );
+
+    for (const article of articlesToUpdate) {
+      const articleCategories = JSON.parse(article.categories);
+      const updatedCategories = articleCategories.map((cat) => {
+        if (cat.toLowerCase() === existingCategory[0].slug.toLowerCase()) {
+          return updateData.slug;
+        }
+        return cat;
+      });
+
+      await db
+        .update(articles)
+        .set({ categories: JSON.stringify(updatedCategories) })
+        .where(eq(articles.id, article.id));
+    }
+
+    return;
   } catch (error) {
-    console.error("❌ Error updating category:", error);
+    console.error(" Error updating category:", error);
     res.status(500).json({
       message: "Internal server error",
       status: 500,
@@ -331,11 +341,6 @@ const updateCategory = async (req, res) => {
   }
 };
 
-/**
- * DELETE /api/categories/:id
- * Delete a category by ID
- * Note: Does not cascade delete articles - they keep their category reference
- */
 const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;

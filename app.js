@@ -39,13 +39,14 @@ app.use(requestIp.mw());
 app.use("/storage", express.static("./public/storage"));
 
 
-//auth router
-app.use(authRouter);
+
 
 
 //ATTACH USER FROM COOKIE TOKEN
 app.use(cookieParserMiddleware);
 
+//auth router
+app.use(authRouter);
 
 // Home route
 app.get("/", (req, res) => {

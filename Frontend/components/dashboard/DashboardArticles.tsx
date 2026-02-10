@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { api } from "../../services/api";
 import { Pagination } from "../Pagination";
 
@@ -29,6 +29,23 @@ const DashboardArticles: React.FC<DashboardArticlesProps> = ({
   const [loading, setLoading] = useState(false);
   const contentRef = useRef<HTMLTextAreaElement>(null);
 
+  const [defaultArticleStatus, setDefaultArticleStatus] = useState("Draft");
+  const [requireFeaturedImage, setRequireFeaturedImage] = useState(false);
+
+
+
+  useEffect(() => 
+    {
+      const fetchArticleSettings = async () => { 
+        const res = await api.settings.getArticleSettings();
+        setDefaultArticleStatus(res.data.default_status || "Draft");
+        setRequireFeaturedImage(res.data.require_featured_image || false);
+      }
+
+      fetchArticleSettings();
+
+     } , [defaultArticleStatus, requireFeaturedImage]);
+
 
   const savedUser = JSON.parse(
     localStorage.getItem("user") ||
@@ -49,7 +66,7 @@ const DashboardArticles: React.FC<DashboardArticlesProps> = ({
     isPrime: false,
     isHeadline: false,
     content: "",
-    status: "Draft",
+    status: defaultArticleStatus || "Draft",
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -849,6 +866,7 @@ const DashboardArticles: React.FC<DashboardArticlesProps> = ({
                     <div className="space-y-3">
                       <input
                         type="file"
+                        required={requireFeaturedImage}
                         accept="image/*"
                         onChange={handleImageUpload}
                         className="w-full border border-gray-200 p-2 text-sm focus:border-[#001733] outline-none rounded-sm bg-white"
