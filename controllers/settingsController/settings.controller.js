@@ -274,7 +274,12 @@ const articleSettings = async( req,res)=>{
 
 
   } catch (error) {
-    
+    console.error("Error fetching article settings:", error);
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 
 

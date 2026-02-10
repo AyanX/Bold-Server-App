@@ -115,7 +115,15 @@ const inviteUser = async (req, res) => {
             updatedAt: now,
           })
           .where(eq(userInvitations.id, existingInvite[0].id));
-      } else {
+      } 
+      else if(    existingInvite.length > 0 &&
+        existingInvite[0].status !== "suspended") {
+        return res.status(409).json({
+          status: 409,
+          message: "User with this email has already been invited",
+        });
+      }
+      else {
         //create new invitation
         // Insert invitation
         await tx.insert(userInvitations).values({

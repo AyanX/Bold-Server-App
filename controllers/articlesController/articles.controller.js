@@ -11,6 +11,7 @@ const {
   capitalizeFirstLetter,
   blurBase64Image,
   saveBase64Image,
+  getUser,
 } = require("../utils");
 
 //create an array of all category slugs
@@ -39,7 +40,7 @@ function mapArticle(article) {
     status: article.status ?? "Draft",
     metaTags: JSON.parse(article.meta_tags || "[]"),
     metaDescription: article.meta_description ?? "",
-    seoScore: article.seo_score ?? 0,
+    seoScore: article.seo_score ?? 1,
     views: article.views ?? 0,
     clicks: article.clicks ?? 0,
     content: article.content ?? "",
@@ -71,7 +72,10 @@ const getAllArticles = async (req, res) => {
 };
 
 const addNewArticle = async (req, res) => {
-  if (!req.user.id) {
+  const {id,name}= getUser(req)
+
+
+  if (!id) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -105,6 +109,11 @@ const addNewArticle = async (req, res) => {
     // Update category article counts for existing categories
 
     for (const cat of categoriesValue) {
+      //ensure cat is string before calling toLowerCase
+      if (typeof cat !== "string") {
+        continue;
+      }
+
       await db
         .update(categoriesDb)
         .set({
@@ -117,7 +126,7 @@ const addNewArticle = async (req, res) => {
     const authorUser = await db
       .select()
       .from(users)
-      .where(eq(users.id, req.user?.id))
+      .where(eq(users.id, id))
       .limit(1);
 
     //save image as url
@@ -129,12 +138,12 @@ const addNewArticle = async (req, res) => {
         title,
         slug,
         excerpt,
-        author_id: Number(req.user.id),
+        author_id: Number(id),
         category: capitalizeFirstLetter(category),
         image,
         author: author
           ? capitalizeFirstLetter(author)
-          : capitalizeFirstLetter(req.user.name),
+          : capitalizeFirstLetter(name),
         read_time,
         is_prime,
         status: capitalizeFirstLetter(status) || "Published",
@@ -164,7 +173,7 @@ const addNewArticle = async (req, res) => {
               ? sql`${users.articles_pending} + 1`
               : sql`${users.articles_pending}`,
         })
-        .where(eq(users.id, req.user?.id));
+        .where(eq(users.id, id));
     });
 
     // resend latest article added
@@ -244,6 +253,9 @@ const addNewArticle = async (req, res) => {
     // categories does not match its slug in db
 
     for (const cat of categoriesValue) {
+       if (typeof cat !== "string") {
+        continue;
+      }
       const categoryRow = await db
         .select()
         .from(categoriesDb)
@@ -317,10 +329,14 @@ const getArticleByIdOrSlug = async (req, res) => {
 const updateArticleById = async (req, res) => {
   const { id } = req.params;
 
+
+  const {id:reqId} = getUser(req)
   //validate user exists
-  if (!req.user.id) {
+  if (!reqId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
+
+  console.log("Updating article with ID:", id, "by user ID:", reqId);
 
   const {
     categories,
@@ -354,7 +370,7 @@ const updateArticleById = async (req, res) => {
       .where(eq(articles.id, Number(id)))
       .limit(1);
 
-    if (!existingArticle.length) {
+    if (existingArticle.length < 1 || !existingArticle[0]) {
       return res.status(404).json({ error: "Article not found" });
     }
 
@@ -371,7 +387,7 @@ const updateArticleById = async (req, res) => {
       requestUserRole !== "admin"
     ) {
       // In case a user changed name, fall back to checking author_id
-      if (existingArticle[0].author_id !== Number(req.user.id)) {
+      if (existingArticle[0]?.author_id !== Number(req.user.id)) {
         console.log(
           "Forbidden: User is not the author or admin",
           req.user?.role,
@@ -387,6 +403,9 @@ const updateArticleById = async (req, res) => {
     // Update category article counts for existing categories, decrement old categories
 
     for (const cat of oldCategories) {
+       if (typeof cat !== "string") {
+        continue;
+      }
       await db
         .update(categoriesDb)
         .set({
@@ -397,6 +416,9 @@ const updateArticleById = async (req, res) => {
     // Update category article counts for new categories, increment new categories
 
     for (const cat of categoriesValue) {
+         if (typeof cat !== "string") {
+        continue;
+      }
       await db
         .update(categoriesDb)
         .set({
@@ -496,6 +518,9 @@ const updateArticleById = async (req, res) => {
   // update the new categories with the article slug for better frontend filtering
   // . find added categories not in old categories and attach the article slug to them
     for (const cat of categoriesValue) {
+         if (typeof cat !== "string") {
+        continue;
+      }
       if (!oldCategories.includes(cat)) {
         // this is a new category added in the update, attach the article slug to it
         const categoryRow = await db
@@ -568,6 +593,11 @@ const deleteArticleById = async (req, res) => {
     .from(articles)
     .where(eq(articles.id, Number(id)))
     .limit(1);
+  // If article doesn't exist, return 404
+    if(!existingArticle.length || !existingArticle[0]) {
+      return res.status(404).json({ error: "Article not found" });
+    }
+
 
   try {
     // Find the requesting user row (limit 1 for safety)
@@ -630,7 +660,9 @@ const deleteArticleById = async (req, res) => {
 
       // update category counts
       for (const cat of articleCategories) {
-        console.log("Decrementing article count for category:", cat);
+           if (typeof cat !== "string") {
+        continue;
+      }
 
         await tx
           .update(categoriesDb)
@@ -673,6 +705,9 @@ const trackView = async (req, res) => {
     //update category views count for categories
 
     for (const cat of viewedArticleCategories) {
+         if (typeof cat !== "string") {
+        continue;
+      }
       await db
         .update(categoriesDb)
         .set({

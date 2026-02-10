@@ -14,6 +14,10 @@ try {
   if (!req.user) {
     throw new Error("Unauthorized");
   }
+
+  if(!req.file){
+    throw new Error("No image to update profile");
+  }
   // Build relative path from uploaded file
   const relativePath = `users/${req.file.filename}`;
 

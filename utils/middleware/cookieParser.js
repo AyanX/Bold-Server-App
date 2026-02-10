@@ -8,6 +8,7 @@ const { TokenExpiredError } = require("jsonwebtoken");
 const { refreshTokens,users } = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq } = require("drizzle-orm");
+const { comparePassword } = require("../bcrypt/bcrypt");
 
   const HandleRefresh = async (req,res,next) => {
     const refreshToken = req.cookies.refreshToken;
@@ -25,7 +26,7 @@ const { eq } = require("drizzle-orm");
     }
 
     try {
-      const refreshPayload = verifyRefreshToken(refreshToken);
+      const refreshPayload = verifyRefreshToken(refreshToken, );
       //returns id and email from refresh token payload
 
       const { id, email } = refreshPayload;
@@ -37,9 +38,15 @@ const { eq } = require("drizzle-orm");
         .where(eq(refreshTokens.userId, Number(id)))
         .limit(1);
 
-      if (!stored) {
+      if (!stored[0]) {
         return res.status(403).json({ message: "Refresh revoked" });
       }
+
+      const isTokenValid = await comparePassword(refreshToken, stored[0].tokenHash);
+
+       if (!isTokenValid) {
+        return res.status(403).json({ message: "Invalid refresh token" });
+       }
 
       const storedUserId = stored[0].userId;
 
@@ -91,15 +98,14 @@ const cookieParserMiddleware = async (req, res, next) => {
   try {
     // Try access token first
     const payload = verifyToken(accessToken);
-
     req.user = payload;
     return next();
   } catch (err) {
     // Only handle expiration errors here, other errors should fail immediately
     if (!(err instanceof TokenExpiredError)) {
-      console.log("Expired Token:", err.message);
-        // ACCESS TOKEN EXPIRED → TRY REFRESH TOKEN
       HandleRefresh(req,res,next);
+    }else{
+        res.status(401).json({ message: "Invalid access token" });
     }
   }
 

@@ -17,6 +17,7 @@ const uploadProfileImage = async (req, res) => {
       message: "Unauthorized",
     });
   }
+
   try {
     // Build relative path from uploaded file
     const { path: relativePath, url: publicUrl } = uploadImageHelper(req, res);
@@ -37,21 +38,22 @@ const uploadProfileImage = async (req, res) => {
       data: {
         path: relativePath,
         url: publicUrl,
-        filename: req.file.originalname,
+        filename: req.file?.originalname,
       },
     });
 
     //update user articles author img in db
 
-      await db.update(articles)
-        .set({ author_image: publicUrl })
-        .where(eq(articles.author_id, Number(req.user.id)));
+    await db
+      .update(articles)
+      .set({ author_image: publicUrl })
+      .where(eq(articles.author_id, Number(req.user.id)));
 
-        console.log(
-          `User ${req.user.name} articles author image updated successfully in database.`,
-        );
+    console.log(
+      `User ${req.user.name} articles author image updated successfully in database.`,
+    );
 
-    return
+    return;
   } catch (error) {
     console.error("Error uploading profile image:", error);
     if (error.message === "Unauthorized") {
@@ -116,6 +118,26 @@ const updateProfile = async (req, res) => {
     // Extract fields to update from req.body (e.g., name, bio, email)
     const { name, bio, email } = req.body;
 
+    //fetch the user from database
+    const userFound = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, Number(id)))
+      .limit(1);
+
+    if (userFound.length === 0) {
+      return res.status(404).json({
+        message: "User not found",
+        status: 404,
+      });
+    }
+
+    const existingUser = userFound[0];
+
+    // track name changed to update articles authors if the name is changed
+    const isNameChanged =
+      name && name.trim().toLowerCase() !== existingUser.name.toLowerCase();
+
     // Build update object with only provided fields
     const updateData = {};
     if (name !== undefined) updateData.name = name;
@@ -150,11 +172,26 @@ const updateProfile = async (req, res) => {
     // Return safe user data
     const safeUserData = safeUser(updatedUser[0]);
 
-    return res.status(200).json({
+    res.status(200).json({
       data: safeUserData,
       message: "Profile updated successfully",
       status: 200,
     });
+
+    // if the name is changed, update the author name in articles as well in the background to maintain consistency
+
+    if (!isNameChanged) {
+      return;
+    }
+
+    await db
+      .update(articles)
+      .set({
+        author: name.trim(),
+      })
+      .where(eq(articles.author_id, Number(id)));
+
+    return;
   } catch (error) {
     if (error.message === "Unauthorized") {
       return res.status(401).json({
@@ -162,7 +199,7 @@ const updateProfile = async (req, res) => {
         status: 401,
       });
     }
-    console.error("❌ Error updating profile:", error);
+    console.error(" Error updating profile:", error);
     return res.status(500).json({
       status: 500,
       message: "Internal server error",

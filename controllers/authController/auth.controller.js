@@ -6,7 +6,8 @@ const { generateToken, generateRefreshToken } = require("../../utils/jwt/jwt");
 const { getClientIp } = require("request-ip");
 const { safeUser } = require("../utils");
 const { getMySQLDateTime } = require("../utils");
-const isoDate = require("../../controllers/utils").getMySQLDateTime();
+
+const { hashPassword, comparePassword } = require("../../utils/bcrypt/bcrypt");
 
 const login = async (req, res) => {
   try {
@@ -36,7 +37,7 @@ const login = async (req, res) => {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await comparePassword(password, user.password);
     // return for invalid passwords
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -44,8 +45,6 @@ const login = async (req, res) => {
 
     // Update login info
     const userIp = getClientIp(req);
-
-
 
     //remove sensitive fields before sending user data
 
@@ -60,7 +59,10 @@ const login = async (req, res) => {
       image: user.image,
     });
 
-    const refreshToken = generateRefreshToken({id: Number(user.id), email: user.email});
+    const refreshToken = generateRefreshToken({
+      id: Number(user.id),
+      email: user.email,
+    });
 
     res
       .cookie("token", token, {
@@ -91,31 +93,37 @@ const login = async (req, res) => {
     const createdAt = getMySQLDateTime(now);
     const expiresAtFormatted = getMySQLDateTime(expiresAt);
 
-await db.transaction(async (tx) => {
+    const hashedToken = await hashPassword(refreshToken);
 
-  //delete existing refresh tokens for the user
-  await tx.delete(refreshTokens).where(eq(refreshTokens.userId, Number(user.id)));
+    await db.transaction(async (tx) => {
+      //delete existing refresh tokens for the user
+      try {
+        await tx
+          .delete(refreshTokens)
+          .where(eq(refreshTokens.userId, Number(user.id)));
+      } catch (err) {
+        console.log("Logging in ", user.name)
+      }
 
-  //  Insert refresh token
-  await tx.insert(refreshTokens).values({
-    userId: Number(user.id),
-    tokenHash: refreshToken,
-    createdAt,
-    expiresAt: expiresAtFormatted,
-  });
+      //  Insert refresh token
+      await tx.insert(refreshTokens).values({
+        userId: Number(user.id),
+        tokenHash: hashedToken,
+        createdAt,
+        expiresAt: expiresAtFormatted,
+      });
 
-  // Update user login metadata
-  await tx
-    .update(users)
-    .set({
-      last_login_at: isoDate,
-      last_login_ip: userIp,
-      status: "Active",
-      login_count: (user.login_count || 0) + 1,
-    })
-    .where(eq(users.id, user.id));
-});
-
+      // Update user login metadata
+      await tx
+        .update(users)
+        .set({
+          last_login_at: getMySQLDateTime(),
+          last_login_ip: userIp,
+          status: "active",
+          login_count: (user.login_count || 0) + 1,
+        })
+        .where(eq(users.id, user.id));
+    });
 
     return res.status(200).json({
       message: "Login successful",
@@ -137,19 +145,19 @@ const logout = async (req, res) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const now = isoDate;
+  const now = getMySQLDateTime();
 
   //find the user
   try {
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.id, Number(id) ))
+      .where(eq(users.id, Number(id)))
       .limit(1);
 
-      if(!user){
-        return res.status(404).json({ message: "User not found" });
-      }
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     //update users last_active
     await db
@@ -160,16 +168,21 @@ const logout = async (req, res) => {
       })
       .where(eq(users.id, Number(id)));
 
-
     // Clear the token cookie
+    res
+      .clearCookie("token", {
+        httpOnly: true,
+        sameSite: "Lax",
+        secure: process.env.NODE_ENV === "production",
+      })
+      .clearCookie("refreshToken", {
+        httpOnly: true,
+        sameSite: "Lax",
+        secure: process.env.NODE_ENV === "production",
+      });
 
-    console.log("Clearing cookies for user ID:", id); 
-
-    res.clearCookie("token", {
-      httpOnly: true,
-      sameSite: "Lax",
-      secure: process.env.NODE_ENV === "production",
-    });
+    //clear refresh tokens from db
+    await db.delete(refreshTokens).where(eq(refreshTokens.userId, Number(id)));
 
     return res.status(200).json({ message: "Logout successful" });
   } catch (error) {

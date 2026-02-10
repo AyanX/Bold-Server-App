@@ -1,8 +1,7 @@
-const { users, userInvitations } = require("../../drizzle/schema");
+const { users, userInvitations, articles } = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq, like } = require("drizzle-orm");
 const crypto = require("crypto");
-const { hashPassword } = require("../../utils/bcrypt/bcrypt");
 const { safeUser } = require("../utils");
 
 //  Format datetime for MySQL
@@ -33,8 +32,6 @@ const getAllUsers = async (req, res) => {
     });
   }
 };
-
-
 
 const getUserById = async (req, res) => {
   try {
@@ -78,8 +75,6 @@ const getUserById = async (req, res) => {
   }
 };
 
-
-
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -93,6 +88,9 @@ const updateUser = async (req, res) => {
         status: 400,
       });
     }
+
+    //track name change to update articles authors if the name is changed
+    let isNameChanged = false;
 
     // Check if user exists
     const existingUser = await db
@@ -114,6 +112,9 @@ const updateUser = async (req, res) => {
     // Validate and add name
     if (name !== undefined && name.trim().length > 0) {
       updateData.name = name.trim();
+      if (name.trim() !== existingUser[0].name) {
+        isNameChanged = true;
+      }
     }
 
     // Validate and add email (check uniqueness if changed)
@@ -160,13 +161,6 @@ const updateUser = async (req, res) => {
     // Always update timestamp
     updateData.updated_at = getMySQLDateTime();
 
-    // Fetch  user
-    const updatedUser = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, Number(id)))
-      .limit(1);
-
     // ensure that the user is not trying to update another user's profile if they are not an admin
     if (req.user.id !== Number(id) && req.user.role.toLowerCase() !== "admin") {
       console.log(
@@ -184,7 +178,7 @@ const updateUser = async (req, res) => {
     }
 
     // Ensure that the user is not trying to change their own role  if they are not an admin
-    if (req.user.role !== "Admin") {
+    if (req.user.role.toLowerCase() !== "admin") {
       if (updateData.role !== undefined) {
         return res.status(403).json({
           message: "Forbidden: Only admins can change roles or emails",
@@ -208,11 +202,35 @@ const updateUser = async (req, res) => {
 
     // Remove password and sensitive info from response
 
-    return res.status(200).json({
+    res.status(200).json({
       data: safeUser(newUpdatedUser),
       message: "User updated successfully",
       status: 200,
     });
+
+    // if the name is changed, update the author name in articles as well in the background to maintain consistency
+
+    if (!isNameChanged && !updateData.image) {
+      return;
+    }
+
+    // only update the author name and image in articles if the name or image is changed to avoid unnecessary updates
+    const dataToUpdate = {};
+
+    if (isNameChanged) {
+      dataToUpdate.author = name.trim();
+    }
+
+    if (updateData.image) {
+      dataToUpdate.author_image = image;
+    }
+
+    await db
+      .update(articles)
+      .set(dataToUpdate)
+      .where(eq(articles.author_id, Number(id)));
+
+    return;
   } catch (error) {
     console.error(" Error updating user:", error);
     res.status(500).json({
@@ -222,18 +240,16 @@ const updateUser = async (req, res) => {
   }
 };
 
-
 const deleteUser = async (req, res) => {
   const { id: adminId } = req.user; // ID of the user making the request
 
-  if(!adminId) {
+  if (!adminId) {
     console.log("Unauthorized delete attempt: No user ID in request");
     return res.status(401).json({
       message: "Unauthorized: User ID not found in request",
       status: 401,
     });
   }
-
 
   try {
     const { id } = req.params;
@@ -256,7 +272,7 @@ const deleteUser = async (req, res) => {
       .where(eq(users.id, Number(adminId)))
       .limit(1);
 
-      console.log("User role for deletion attempt by:", userRole[0].role); // Debug log
+    console.log("User role for deletion attempt by:", userRole[0].role); // Debug log
 
     if (userRole.length === 0 || userRole[0].role.toLowerCase() !== "admin") {
       return res.status(403).json({
@@ -280,7 +296,7 @@ const deleteUser = async (req, res) => {
       .where(eq(users.id, Number(id)))
       .limit(1);
 
-    console.log("Existing user for deletion:", existingUser[0]); 
+    console.log("Existing user for deletion:", existingUser[0]);
 
     if (existingUser.length === 0) {
       return res.status(404).json({
@@ -292,17 +308,20 @@ const deleteUser = async (req, res) => {
     // Delete user
     await db.delete(users).where(eq(users.id, Number(id)));
 
-
     //change invitation status to suspended if the user is deleted
     await db
       .update(userInvitations)
       .set({ status: "suspended" })
       .where(eq(userInvitations.id, existingUser[0].id));
 
-    return res.status(200).json({
+    res.status(200).json({
       message: "User deleted successfully",
       status: 200,
     });
+
+    // delete user token if it exists
+
+    await db.delete().return;
   } catch (error) {
     console.error(" Error deleting user:", error);
     res.status(500).json({

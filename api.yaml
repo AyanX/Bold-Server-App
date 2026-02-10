@@ -1,0 +1,1294 @@
+swagger: "2.0"
+info:
+  title: Bold Server API
+  description: API documentation for Bold Server - Articles, Users, Categories, and Analytics management
+  version: 1.0.0
+  contact:
+    name: Bold Team
+
+host: localhost:8000
+basePath: /api
+schemes:
+  - http
+  - https
+
+securityDefinitions:
+  Bearer:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: JWT token in header with Bearer prefix
+
+tags:
+  - name: Articles
+    description: Article management endpoints
+  - name: Categories
+    description: Category management endpoints
+  - name: Authentication
+    description: User authentication endpoints
+  - name: Users
+    description: User management endpoints
+  - name: Campaigns
+    description: Ad campaigns management
+  - name: User Management
+    description: Advanced user management (invitations, status)
+  - name: Profile
+    description: User profile management
+  - name: Settings
+    description: System and user settings
+  - name: Analytics
+    description: Analytics and metrics tracking
+  - name: Ads
+    description: Public ads/campaigns endpoints
+
+paths:
+  /:
+    get:
+      summary: Health check
+      description: Check if API is working
+      tags:
+        - General
+      responses:
+        200:
+          description: API is working
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "api working"
+
+  /login:
+    post:
+      summary: User login
+      description: Authenticate user with email and password
+      tags:
+        - Authentication
+      parameters:
+        - in: body
+          name: credentials
+          required: true
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+                example: user@example.com
+              password:
+                type: string
+                example: password123
+      responses:
+        200:
+          description: Login successful
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+              message:
+                type: string
+        401:
+          description: Invalid credentials
+
+  /logout:
+    post:
+      summary: User logout
+      description: Logout the current user
+      tags:
+        - Authentication
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: Logout successful
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+  /user:
+    get:
+      summary: Get current user
+      description: Get the authenticated user's information
+      tags:
+        - Authentication
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: User data retrieved
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+  /articles:
+    get:
+      summary: Get all articles
+      description: Retrieve all articles with pagination and filtering
+      tags:
+        - Articles
+      parameters:
+        - in: query
+          name: page
+          type: integer
+          description: Page number
+        - in: query
+          name: limit
+          type: integer
+          description: Items per page
+        - in: query
+          name: category
+          type: string
+          description: Filter by category
+      responses:
+        200:
+          description: List of articles
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Article'
+
+    post:
+      summary: Create new article
+      description: Create a new article (requires authentication)
+      tags:
+        - Articles
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: article
+          required: true
+          schema:
+            $ref: '#/definitions/ArticleInput'
+      responses:
+        201:
+          description: Article created successfully
+          schema:
+            $ref: '#/definitions/Article'
+        400:
+          description: Invalid input
+
+  /articles/{identifier}:
+    get:
+      summary: Get article by ID or slug
+      description: Retrieve a single article by ID or URL slug
+      tags:
+        - Articles
+      parameters:
+        - in: path
+          name: identifier
+          type: string
+          required: true
+          description: Article ID or slug
+      responses:
+        200:
+          description: Article found
+          schema:
+            $ref: '#/definitions/Article'
+        404:
+          description: Article not found
+
+    put:
+      summary: Update article
+      description: Update an existing article (requires authentication)
+      tags:
+        - Articles
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: identifier
+          type: string
+          required: true
+        - in: body
+          name: article
+          required: true
+          schema:
+            $ref: '#/definitions/ArticleInput'
+      responses:
+        200:
+          description: Article updated
+          schema:
+            $ref: '#/definitions/Article'
+
+    delete:
+      summary: Delete article
+      description: Delete an article (requires authentication)
+      tags:
+        - Articles
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: identifier
+          type: string
+          required: true
+      responses:
+        200:
+          description: Article deleted successfully
+
+  /articles/{id}/view:
+    post:
+      summary: Track article view
+      description: Record that an article was viewed
+      tags:
+        - Articles
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+      responses:
+        200:
+          description: View tracked
+          schema:
+            type: object
+
+  /articles/{id}/click:
+    post:
+      summary: Track article click
+      description: Record that an article was clicked
+      tags:
+        - Articles
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+      responses:
+        200:
+          description: Click tracked
+          schema:
+            type: object
+
+  /categories:
+    get:
+      summary: Get all categories
+      description: Retrieve all article categories
+      tags:
+        - Categories
+      responses:
+        200:
+          description: List of categories
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Category'
+
+    post:
+      summary: Create category
+      description: Create a new category (requires authentication)
+      tags:
+        - Categories
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: category
+          required: true
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+      responses:
+        201:
+          description: Category created
+          schema:
+            $ref: '#/definitions/Category'
+
+  /categories/{id}:
+    get:
+      summary: Get category by ID
+      tags:
+        - Categories
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+      responses:
+        200:
+          description: Category found
+          schema:
+            $ref: '#/definitions/Category'
+
+    put:
+      summary: Update category
+      tags:
+        - Categories
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+        - in: body
+          name: category
+          required: true
+          schema:
+            type: object
+      responses:
+        200:
+          description: Category updated
+
+    delete:
+      summary: Delete category
+      tags:
+        - Categories
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+      responses:
+        200:
+          description: Category deleted
+
+  /categories/{category}:
+    get:
+      summary: Get articles by category
+      tags:
+        - Categories
+      parameters:
+        - in: path
+          name: category
+          type: string
+          required: true
+      responses:
+        200:
+          description: Articles in category
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Article'
+
+  /users:
+    get:
+      summary: Get all users
+      description: Retrieve all users (requires authentication)
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      parameters:
+        - in: query
+          name: search
+          type: string
+        - in: query
+          name: role
+          type: string
+        - in: query
+          name: status
+          type: string
+      responses:
+        200:
+          description: List of users
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/User'
+
+    post:
+      summary: Invite user
+      description: Send invitation to a new user
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: user
+          required: true
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+              role:
+                type: string
+      responses:
+        201:
+          description: Invitation sent
+          schema:
+            type: object
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+      responses:
+        200:
+          description: User found
+          schema:
+            $ref: '#/definitions/User'
+
+    put:
+      summary: Update user
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+        - in: body
+          name: user
+          required: true
+          schema:
+            type: object
+      responses:
+        200:
+          description: User updated
+          schema:
+            $ref: '#/definitions/User'
+
+    delete:
+      summary: Delete user
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+      responses:
+        200:
+          description: User deleted
+
+  /users/{id}/image:
+    post:
+      summary: Upload user profile image
+      tags:
+        - User Management
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+        - in: formData
+          name: image
+          type: file
+          required: true
+      responses:
+        200:
+          description: Image uploaded successfully
+          schema:
+            type: object
+            properties:
+              imageUrl:
+                type: string
+
+  /users/{id}/status:
+    patch:
+      summary: Update user status
+      tags:
+        - User Management
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+        - in: body
+          name: status
+          required: true
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+      responses:
+        200:
+          description: Status updated
+
+  /users/bulk-status:
+    post:
+      summary: Update multiple users' status
+      tags:
+        - User Management
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: bulk
+          required: true
+          schema:
+            type: object
+            properties:
+              user_ids:
+                type: array
+                items:
+                  type: string
+              status:
+                type: string
+      responses:
+        200:
+          description: Users updated
+
+  /users/statistics/overview:
+    get:
+      summary: Get user statistics
+      tags:
+        - User Management
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: User statistics
+          schema:
+            type: object
+
+  /users/invite/image:
+    post:
+      summary: Upload invitation preview image
+      tags:
+        - User Management
+      security:
+        - Bearer: []
+      parameters:
+        - in: formData
+          name: image
+          type: file
+          required: true
+      responses:
+        200:
+          description: Image uploaded
+          schema:
+            type: object
+
+  /users/accept-invitation:
+    post:
+      summary: Accept user invitation
+      tags:
+        - User Management
+      parameters:
+        - in: body
+          name: invitation
+          required: true
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+              otp:
+                type: string
+              password:
+                type: string
+              password_confirmation:
+                type: string
+      responses:
+        200:
+          description: Invitation accepted
+          schema:
+            type: object
+
+  /users/invitations/list:
+    get:
+      summary: Get invitations list
+      tags:
+        - User Management
+      security:
+        - Bearer: []
+      parameters:
+        - in: query
+          name: status
+          type: string
+      responses:
+        200:
+          description: List of invitations
+          schema:
+            type: array
+            items:
+              type: object
+
+  /users/invitations/{id}/resend:
+    post:
+      summary: Resend invitation
+      tags:
+        - User Management
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+      responses:
+        200:
+          description: Invitation resent
+
+  /users/invitations/{id}:
+    delete:
+      summary: Delete invitation
+      tags:
+        - User Management
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+      responses:
+        200:
+          description: Invitation deleted
+
+  /campaigns:
+    get:
+      summary: Get all campaigns
+      tags:
+        - Campaigns
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: List of campaigns
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Campaign'
+
+    post:
+      summary: Create campaign
+      tags:
+        - Campaigns
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: campaign
+          required: true
+          schema:
+            $ref: '#/definitions/CampaignInput'
+      responses:
+        201:
+          description: Campaign created
+
+  /campaigns/{id}:
+    get:
+      summary: Get campaign by ID
+      tags:
+        - Campaigns
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: integer
+          required: true
+      responses:
+        200:
+          description: Campaign found
+          schema:
+            $ref: '#/definitions/Campaign'
+
+    put:
+      summary: Update campaign
+      tags:
+        - Campaigns
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: integer
+          required: true
+        - in: body
+          name: campaign
+          required: true
+          schema:
+            $ref: '#/definitions/CampaignInput'
+      responses:
+        200:
+          description: Campaign updated
+
+    delete:
+      summary: Delete campaign
+      tags:
+        - Campaigns
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: id
+          type: integer
+          required: true
+      responses:
+        200:
+          description: Campaign deleted
+
+  /ads/active:
+    get:
+      summary: Get active ads
+      description: Get all active campaigns/ads (public endpoint)
+      tags:
+        - Ads
+      parameters:
+        - in: query
+          name: type
+          type: string
+          description: Ad type filter
+      responses:
+        200:
+          description: List of active ads
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Campaign'
+
+  /ads/{id}/impression:
+    post:
+      summary: Track ad impression
+      description: Record an ad impression (public endpoint)
+      tags:
+        - Ads
+      parameters:
+        - in: path
+          name: id
+          type: integer
+          required: true
+      responses:
+        200:
+          description: Impression tracked
+          schema:
+            type: object
+
+  /ads/{id}/click:
+    post:
+      summary: Track ad click
+      description: Record an ad click (public endpoint)
+      tags:
+        - Ads
+      parameters:
+        - in: path
+          name: id
+          type: integer
+          required: true
+      responses:
+        200:
+          description: Click tracked
+          schema:
+            type: object
+
+  /settings/profile:
+    get:
+      summary: Get user profile
+      tags:
+        - Profile
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: User profile
+          schema:
+            $ref: '#/definitions/Profile'
+
+    put:
+      summary: Update user profile
+      tags:
+        - Profile
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: profile
+          required: true
+          schema:
+            type: object
+      responses:
+        200:
+          description: Profile updated
+          schema:
+            $ref: '#/definitions/Profile'
+
+  /settings/profile/image:
+    post:
+      summary: Upload profile image
+      tags:
+        - Profile
+      security:
+        - Bearer: []
+      parameters:
+        - in: formData
+          name: image
+          type: file
+          required: true
+      responses:
+        200:
+          description: Image uploaded
+          schema:
+            type: object
+
+  /settings:
+    get:
+      summary: Get all settings
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: Settings object
+          schema:
+            type: object
+
+    put:
+      summary: Update settings
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: settings
+          required: true
+          schema:
+            type: object
+      responses:
+        200:
+          description: Settings updated
+
+  /settings/{key}:
+    put:
+      summary: Update single setting
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: key
+          type: string
+          required: true
+        - in: body
+          name: value
+          required: true
+          schema:
+            type: object
+            properties:
+              value:
+                type: string
+      responses:
+        200:
+          description: Setting updated
+
+  /settings/sidebar-collapsed:
+    get:
+      summary: Get sidebar collapsed state
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: Sidebar state
+          schema:
+            type: object
+
+  /settings/article-settings:
+    get:
+      summary: Get article settings
+      tags:
+        - Settings
+      responses:
+        200:
+          description: Article settings
+          schema:
+            type: object
+
+  /settings/theme:
+    get:
+      summary: Get theme settings
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: Theme settings
+          schema:
+            type: object
+
+  /settings/group/{group}:
+    get:
+      summary: Get settings by group
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: group
+          type: string
+          required: true
+      responses:
+        200:
+          description: Settings group
+          schema:
+            type: object
+
+  /settings/password:
+    post:
+      summary: Update password
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: passwords
+          required: true
+          schema:
+            type: object
+            properties:
+              currentPassword:
+                type: string
+              newPassword:
+                type: string
+      responses:
+        200:
+          description: Password updated
+
+  /settings/system-stats:
+    get:
+      summary: Get system statistics
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: System statistics
+          schema:
+            type: object
+
+  /settings/export:
+    get:
+      summary: Export settings
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: Settings exported
+          schema:
+            type: object
+
+  /settings/clear-cache:
+    post:
+      summary: Clear cache
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: Cache cleared
+
+  /settings/reset/{group}:
+    post:
+      summary: Reset settings group
+      tags:
+        - Settings
+      security:
+        - Bearer: []
+      parameters:
+        - in: path
+          name: group
+          type: string
+          required: true
+      responses:
+        200:
+          description: Settings reset
+
+  /analytics/dashboard:
+    get:
+      summary: Get dashboard metrics
+      tags:
+        - Analytics
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: Dashboard metrics
+          schema:
+            type: object
+            properties:
+              totalArticles:
+                type: integer
+              totalUsers:
+                type: integer
+              activeVisitors:
+                type: integer
+              impressions:
+                type: integer
+
+  /analytics/logs:
+    get:
+      summary: Get analytics logs
+      tags:
+        - Analytics
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: Analytics logs
+          schema:
+            type: array
+            items:
+              type: object
+
+  /analytics/active-visitors:
+    get:
+      summary: Get active visitors count
+      tags:
+        - Analytics
+      responses:
+        200:
+          description: Active visitors
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+
+  /analytics/track:
+    post:
+      summary: Track page view
+      tags:
+        - Analytics
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: tracking
+          required: true
+          schema:
+            type: object
+            properties:
+              session_id:
+                type: string
+              page_url:
+                type: string
+              page_title:
+                type: string
+              referrer:
+                type: string
+              device_type:
+                type: string
+              browser:
+                type: string
+              os:
+                type: string
+              screen_width:
+                type: integer
+      responses:
+        200:
+          description: Page view tracked
+
+  /forgot-password:
+    post:
+      summary: Request password reset
+      tags:
+        - Authentication
+      parameters:
+        - in: body
+          name: email
+          required: true
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+      responses:
+        200:
+          description: Password reset email sent
+
+  /reset-password:
+    post:
+      summary: Reset password with token
+      tags:
+        - Authentication
+      parameters:
+        - in: body
+          name: reset
+          required: true
+          schema:
+            type: object
+            properties:
+              token:
+                type: string
+              password:
+                type: string
+      responses:
+        200:
+          description: Password reset successful
+
+definitions:
+  Article:
+    type: object
+    properties:
+      id:
+        type: string
+      title:
+        type: string
+      slug:
+        type: string
+      excerpt:
+        type: string
+      category:
+        type: string
+      image:
+        type: string
+      author:
+        type: string
+      content:
+        type: string
+      date:
+        type: string
+      readTime:
+        type: string
+      isPrime:
+        type: boolean
+      status:
+        type: string
+      seoScore:
+        type: integer
+
+  ArticleInput:
+    type: object
+    required:
+      - title
+      - excerpt
+      - content
+      - category
+    properties:
+      title:
+        type: string
+      excerpt:
+        type: string
+      content:
+        type: string
+      category:
+        type: string
+      image:
+        type: string
+      author:
+        type: string
+      isPrime:
+        type: boolean
+
+  Category:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+      slug:
+        type: string
+
+  User:
+    type: object
+    properties:
+      id:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      status:
+        type: string
+      image:
+        type: string
+      createdAt:
+        type: string
+
+  Profile:
+    type: object
+    properties:
+      id:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      bio:
+        type: string
+      image:
+        type: string
+      phone:
+        type: string
+
+  Campaign:
+    type: object
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      description:
+        type: string
+      image:
+        type: string
+      type:
+        type: string
+      status:
+        type: string
+      startDate:
+        type: string
+      endDate:
+        type: string
+      impressions:
+        type: integer
+      clicks:
+        type: integer
+
+  CampaignInput:
+    type: object
+    required:
+      - name
+      - type
+    properties:
+      name:
+        type: string
+      description:
+        type: string
+      image:
+        type: string
+      type:
+        type: string
+      startDate:
+        type: string
+      endDate:
+        type: string
