@@ -265,6 +265,7 @@ const userInvitations = mysqlTable(
   "user_invitations",
   {
     id: bigint({ mode: "number", unsigned: true }).autoincrement().notNull(),
+    userId: bigint("user_id", { mode: "number", unsigned: true }),
     name: varchar({ length: 255 }).notNull(),
     email: varchar({ length: 255 }).notNull(),
     role: varchar({ length: 255 }).default("Contributor").notNull(),

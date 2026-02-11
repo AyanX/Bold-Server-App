@@ -15,6 +15,6 @@ analyticsRouter.get("/active-visitors", AuthCheck, (req, res) => {
     res.json({ message: "api working" })
 })
 
-analyticsRouter.post("/track", AuthCheck, postAnalyticsData)
+analyticsRouter.post("/track", postAnalyticsData)
 
 module.exports = analyticsRouter;

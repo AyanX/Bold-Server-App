@@ -1,6 +1,6 @@
 const { userInvitations, users } = require("../../drizzle/schema");
 const db = require("../../db/db");
-const { eq, and } = require("drizzle-orm");
+const { eq, and, sql } = require("drizzle-orm");
 const { hashPassword, comparePassword } = require("../../utils/bcrypt/bcrypt");
 const {
   generateOTP,
@@ -13,6 +13,7 @@ const {
   sendInvitationEmail,
 } = require("./utils.users.management.controller");
 const { uploadImageHelper } = require("../utils");
+const sendMail = require("../../mailer/nodemailer.config");
 
 const inviteUser = async (req, res) => {
   const { name: invitor, role } = req.user;
@@ -55,13 +56,9 @@ const inviteUser = async (req, res) => {
       .where(eq(userInvitations.email, email))
       .limit(1);
 
-    // if user with the email already has an invitation and it is still pending return conflict
-    // status can be "suspended" if the invitation was suspended by admin, in that case we should allow to create a new invitation
-    if (
-      existingInvite.length > 0 &&
-      (existingInvite[0].status === "pending" ||
-        existingInvite[0].status === "accepted")
-    ) {
+    // if user with the email already has an invitation and it is still active return conflict
+    // status can be "suspended" or pending, if the invitation was suspended by admin, in that case we should allow to create a new invitation
+    if (existingInvite.length > 0 && existingInvite[0].status === "accepted") {
       return res.status(409).json({
         status: 409,
         message: "User with this email has already been invited",
@@ -76,14 +73,21 @@ const inviteUser = async (req, res) => {
 
     //send email with OTP
     try {
-      await sendInvitationEmail({
-        email,
-        name,
-        otp,
-        role,
-        inviterName: invitor,
-        department: department || "N/A",
-      });
+      const mailOptions = {
+        to: email,
+        subject: "You're Invited to Join Our Platform!",
+        text: `Hello ${name},\n\nYou have been invited to join our platform as 
+        a ${role} in the ${department} department. Please use the following
+         OTP code to accept the invitation and create your account:\n\nOTP Code: ${otp}\n\nThis code will 
+         expire in 24 hours.\n
+         
+         Visit http://localhost:3000/#/accept-invitation to accept the invitation and set up your account.\n\nIf you have any questions, feel free to reach out to us. \n
+         
+         \nBest regards,\n${invitor}`,
+      };
+
+      console.log(`Sending invitation email to ${email}:`);
+      await sendMail(mailOptions);
     } catch (error) {
       console.error(`Failed to send invitation email to ${email}:`, error);
       return res.status(500).json({
@@ -92,12 +96,72 @@ const inviteUser = async (req, res) => {
       });
     }
 
+
+  
+
+
     // Create invitation record in database
     await db.transaction(async (tx) => {
+
+      // Insert pending user
+    if(existingInvite.length > 0 && (existingInvite[0]?.status.toLowerCase() === "suspended" || existingInvite[0]?.status.toLowerCase() === "pending")){
+        const dataToUpdate = {}
+        if(name) dataToUpdate.name = name.trim();
+        if(role) dataToUpdate.role = role;
+        if(department) dataToUpdate.department = department;
+        if(phone) dataToUpdate.phone = phone;
+        if(bio) dataToUpdate.bio = bio;
+        if(image) dataToUpdate.image = image;
+        dataToUpdate.updatedAt = now;
+        dataToUpdate.status = "Pending";
+
+        await tx.update(users)
+        .set(dataToUpdate)
+        .where(
+          and(
+            eq(users.email, email.toLowerCase().trim()),
+            eq(users.status, "Suspended"),
+          )
+        );
+    }else{
+        await tx.insert(users).values({
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        role: role || "Contributor",
+        department: department || null,
+        phone: phone || null,
+        bio: bio || null,
+        status: "Pending",
+        created_at: now,
+        updated_at: now,
+        image: image || null,
+        invited_by: `${invitor} || ${role}`,
+        invited_via: "invitation",
+      });
+    }
+
+
+       // query the inserted user to get the id
+        const [insertedUser] = await tx
+        .select().from(users).where(
+          and(
+            eq(users.email, email.toLowerCase().trim()),
+            eq(users.status, "Pending"),
+          )
+        ).limit(1);
+
+        if (!insertedUser) {
+          console.error(`Failed to retrieve inserted user for email ${email}`);
+          throw new Error("Failed to create user");
+        }
+
+       const userId = insertedUser.id;
+
       // if invitation was suspended, we should update the existing record instead of creating a new one
       if (
-        existingInvite.length > 0 &&
-        existingInvite[0].status === "suspended"
+        (existingInvite.length > 0 &&
+          existingInvite[0]?.status === "suspended") ||
+        existingInvite[0]?.status === "pending"
       ) {
         await tx
           .update(userInvitations)
@@ -114,25 +178,28 @@ const inviteUser = async (req, res) => {
             status: "pending",
             updatedAt: now,
           })
-          .where(eq(userInvitations.id, existingInvite[0].id));
-      } 
-      else if(    existingInvite.length > 0 &&
-        existingInvite[0].status !== "suspended") {
+          .where(eq(userInvitations.userId, userId));
+      } else if (
+        existingInvite.length > 0 &&
+        existingInvite[0]?.status === "accepted"
+      ) {
+        console.log(`User with email ${email} already accepted an invitation`);
         return res.status(409).json({
           status: 409,
           message: "User with this email has already been invited",
         });
-      }
-      else {
+      } else {
         //create new invitation
         // Insert invitation
         await tx.insert(userInvitations).values({
           name: name.trim(),
+          userId: userId,
           email: email.toLowerCase().trim(),
           role: role || "Contributor",
           department: department || null,
           phone: phone || null,
           bio: bio || "No bio available.",
+          status: "pending",
           otpHash: otpHash,
           otpExpiresAt: otpExpiresAt,
           invitedBy: `${invitor} || ${role}`,
@@ -141,29 +208,9 @@ const inviteUser = async (req, res) => {
           updatedAt: now,
         });
       }
-
-      // Insert pending user
-      await tx.insert(users).values({
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        role: role || "Contributor",
-        department: department || null,
-        phone: phone || null,
-        bio: bio || null,
-        status: "Pending",
-        created_at: now,
-        updated_at: now,
-        image: image || null,
-        invited_by: `${invitor} || ${role}`,
-        invited_via: "invitation",
-      });
     });
 
-    console.log(`Invitation created for ${email} with OTP: ${otp}`);
     // Send invitation email
-
-    console.log(`User invitation created for ${email}`);
-
     return res.status(201).json({
       status: 201,
       message: "Invitation sent successfully",
@@ -171,6 +218,7 @@ const inviteUser = async (req, res) => {
         email,
         name,
         role,
+        image,
         status: "pending",
         createdAt: now,
       },
@@ -301,7 +349,7 @@ const acceptInvitation = async (req, res) => {
           status: "accepted",
           updatedAt: now,
         })
-        .where(eq(userInvitations.id, invitationRecord.id));
+        .where(eq(userInvitations.userId, invitationRecord.userId));
     });
     console.log(`User ${email} accepted invitation and created account`);
 
@@ -323,167 +371,7 @@ const acceptInvitation = async (req, res) => {
   }
 };
 
-const getInvitationsList = async (req, res) => {
-  try {
-    const { status, role, search } = req.query;
-
-    let query = db.select().from(userInvitations);
-
-    if (status) {
-      query = query.where(eq(userInvitations.status, status));
-    }
-
-    if (role) {
-      query = query.where(eq(userInvitations.role, role));
-    }
-
-    const invitations = await query;
-
-    console.log(`Fetched ${invitations.length} invitations`);
-
-    return res.status(200).json({
-      status: 200,
-      message: "Invitations fetched successfully",
-      data: invitations,
-    });
-  } catch (error) {
-    console.error(" Error fetching invitations:", error);
-    return res.status(500).json({
-      status: 500,
-      message: "Internal server error",
-    });
-  }
-};
-
-const resendInvitation = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({
-        status: 400,
-        message: "Missing invitation ID",
-      });
-    }
-
-    // Find invitation
-    const invitation = await db
-      .select()
-      .from(userInvitations)
-      .where(eq(userInvitations.id, parseInt(id)))
-      .limit(1);
-
-    if (invitation.length === 0) {
-      return res.status(404).json({
-        status: 404,
-        message: "Invitation not found",
-      });
-    }
-
-    const invitationRecord = invitation[0];
-
-    // Check if already accepted
-    if (invitationRecord.status === "accepted") {
-      return res.status(409).json({
-        status: 409,
-        message: "Invitation has already been accepted",
-      });
-    }
-
-    // Generate new OTP
-    const newOTP = generateOTP();
-    const newOTPHash = await hashOTP(newOTP);
-    const newOTPExpiresAt = getOTPExpirationTime();
-    const now = getMySQLDateTime();
-
-    // Update invitation with new OTP
-    await db
-      .update(userInvitations)
-      .set({
-        otpCode: newOTP,
-        otpHash: newOTPHash,
-        otpExpiresAt: newOTPExpiresAt,
-        updatedAt: now,
-      })
-      .where(eq(userInvitations.id, parseInt(id)));
-
-    // Send new invitation email
-    await sendInvitationEmail({
-      email: invitationRecord.email,
-      name: invitationRecord.name,
-      otp: newOTP,
-      role: invitationRecord.role,
-      department: invitationRecord.department || "N/A",
-    });
-
-    console.log(`🔄 Invitation resent to ${invitationRecord.email}`);
-
-    return res.status(200).json({
-      status: 200,
-      message: "Invitation resent successfully",
-      data: {
-        id: invitationRecord.id,
-        email: invitationRecord.email,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Error resending invitation:", error);
-    return res.status(500).json({
-      status: 500,
-      message: "Internal server error",
-    });
-  }
-};
-
-const deleteInvitation = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({
-        status: 400,
-        message: "Missing invitation ID",
-      });
-    }
-
-    // Find invitation
-    const invitation = await db
-      .select()
-      .from(userInvitations)
-      .where(eq(userInvitations.id, parseInt(id)))
-      .limit(1);
-
-    if (invitation.length === 0) {
-      return res.status(404).json({
-        status: 404,
-        message: "Invitation not found",
-      });
-    }
-
-    // Delete invitation
-    await db
-      .delete(userInvitations)
-      .where(eq(userInvitations.id, parseInt(id)));
-
-    console.log(` Invitation ${id} deleted`);
-
-    return res.status(200).json({
-      status: 200,
-      message: "Invitation deleted successfully",
-    });
-  } catch (error) {
-    console.error("❌ Error deleting invitation:", error);
-    return res.status(500).json({
-      status: 500,
-      message: "Internal server error",
-    });
-  }
-};
-
 const uploadUserImage = async (req, res) => {
-
-
-
   try {
     const { id } = req.params;
 
@@ -505,7 +393,6 @@ const uploadUserImage = async (req, res) => {
       })
       .where(eq(users.id, Number(id)));
 
-
     return res.status(200).json({
       status: 200,
       message: "Image uploaded successfully",
@@ -524,149 +411,9 @@ const uploadUserImage = async (req, res) => {
   }
 };
 
-const updateUserStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!id || !status) {
-      return res.status(400).json({
-        status: 400,
-        message: "Missing required fields: id, status",
-      });
-    }
-
-    const validStatuses = ["active", "inactive", "suspended"];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        status: 400,
-        message: `Invalid status. Allowed: ${validStatuses.join(", ")}`,
-      });
-    }
-
-    const now = getMySQLDateTime();
-
-    // Update user status
-    await db
-      .update(users)
-      .set({
-        status: status,
-        updatedAt: now,
-      })
-      .where(eq(users.id, parseInt(id)));
-
-    console.log(`👤 User ${id} status updated to ${status}`);
-
-    return res.status(200).json({
-      status: 200,
-      message: "User status updated successfully",
-    });
-  } catch (error) {
-    console.error("❌ Error updating user status:", error);
-    return res.status(500).json({
-      status: 500,
-      message: "Internal server error",
-    });
-  }
-};
-
-const bulkUpdateUserStatus = async (req, res) => {
-  try {
-    const { user_ids, status } = req.body;
-
-    if (!user_ids || !Array.isArray(user_ids) || !status) {
-      return res.status(400).json({
-        status: 400,
-        message: "Missing required fields: user_ids (array), status",
-      });
-    }
-
-    const validStatuses = ["active", "inactive", "suspended"];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        status: 400,
-        message: `Invalid status. Allowed: ${validStatuses.join(", ")}`,
-      });
-    }
-
-    const now = getMySQLDateTime();
-
-    // Update multiple users
-    for (const userId of user_ids) {
-      await db
-        .update(users)
-        .set({
-          status: status,
-          updatedAt: now,
-        })
-        .where(eq(users.id, parseInt(userId)));
-    }
-
-    console.log(
-      `👥 Bulk status update for ${user_ids.length} users to ${status}`,
-    );
-
-    return res.status(200).json({
-      status: 200,
-      message: `Status updated for ${user_ids.length} users`,
-    });
-  } catch (error) {
-    console.error("❌ Error bulk updating user status:", error);
-    return res.status(500).json({
-      status: 500,
-      message: "Internal server error",
-    });
-  }
-};
-
-const getUserStatistics = async (req, res) => {
-  try {
-    const allUsers = await db.select().from(users);
-    const allInvitations = await db.select().from(userInvitations);
-
-    const pendingInvitations = allInvitations.filter(
-      (inv) => inv.status === "pending",
-    ).length;
-    const acceptedInvitations = allInvitations.filter(
-      (inv) => inv.status === "accepted",
-    ).length;
-    const activeUsers = allUsers.filter((u) => u.status === "active").length;
-    const inactiveUsers = allUsers.filter(
-      (u) => u.status === "inactive",
-    ).length;
-
-    console.log("User statistics fetched");
-
-    return res.status(200).json({
-      status: 200,
-      message: "Statistics fetched successfully",
-      data: {
-        totalUsers: allUsers.length,
-        activeUsers,
-        inactiveUsers,
-        totalInvitations: allInvitations.length,
-        pendingInvitations,
-        acceptedInvitations,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Error fetching user statistics:", error);
-    return res.status(500).json({
-      status: 500,
-      message: "Internal server error",
-    });
-  }
-};
-
 module.exports = {
   inviteUser,
   uploadInviteImage,
   acceptInvitation,
-  getInvitationsList,
-  resendInvitation,
-  deleteInvitation,
   uploadUserImage,
-  updateUserStatus,
-  bulkUpdateUserStatus,
-  getUserStatistics,
 };

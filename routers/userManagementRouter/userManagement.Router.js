@@ -2,16 +2,9 @@ const express = require('express');
 const upload = require('../../utils/middleware/multer');
 const AuthCheck = require('../../utils/authCheck/authCheck');
 const {
-    inviteUser,
     uploadInviteImage,
     acceptInvitation,
-    getInvitationsList,
-    resendInvitation,
-    deleteInvitation,
     uploadUserImage,
-    updateUserStatus,
-    bulkUpdateUserStatus,
-    getUserStatistics,
 } = require('../../controllers/usersManagementController/users.management.controller');
 
 
@@ -19,19 +12,18 @@ const {
 const userManagementRouter = express.Router();
 
 // Invitation routes
-// userManagementRouter.post("/invite", inviteUser);
 userManagementRouter.post("/invite/image", AuthCheck, upload.single('image'), uploadInviteImage);
 userManagementRouter.post("/accept-invitation", acceptInvitation);
-userManagementRouter.get("/invitations/list", AuthCheck, getInvitationsList);
-userManagementRouter.post("/invitations/:id/resend", AuthCheck, resendInvitation);
-userManagementRouter.delete("/invitations/:id", AuthCheck, deleteInvitation);
+userManagementRouter.get("/invitations/list", AuthCheck, (req,res)=>res.send("api working"));
+userManagementRouter.post("/invitations/:id/resend", AuthCheck, (req,res)=>res.send("api working")  );
+userManagementRouter.delete("/invitations/:id", AuthCheck, (req,res)=>res.send("api working")    );
 
 // User management routes
 userManagementRouter.post("/:id/image", AuthCheck, upload.single('image'), uploadUserImage);
-userManagementRouter.patch("/:id/status", AuthCheck, updateUserStatus);
-userManagementRouter.post("/bulk-status", AuthCheck, bulkUpdateUserStatus);
+userManagementRouter.patch("/:id/status", AuthCheck, (req,res)=>res.send("api working")  );
+userManagementRouter.post("/bulk-status", AuthCheck, (req,res)=>res.send("api working"));
 
 // Statistics route
-userManagementRouter.get("/statistics/overview", AuthCheck, getUserStatistics);
+userManagementRouter.get("/statistics/overview", AuthCheck, (req,res)=>res.send("api working") );
 
 module.exports = userManagementRouter;

@@ -272,8 +272,6 @@ const deleteUser = async (req, res) => {
       .where(eq(users.id, Number(adminId)))
       .limit(1);
 
-    console.log("User role for deletion attempt by:", userRole[0].role); // Debug log
-
     if (userRole.length === 0 || userRole[0].role.toLowerCase() !== "admin") {
       return res.status(403).json({
         message: "Forbidden: Only admins can delete users",
@@ -305,14 +303,21 @@ const deleteUser = async (req, res) => {
       });
     }
 
-    // Delete user
-    await db.delete(users).where(eq(users.id, Number(id)));
+ db.transaction(async (tx)=>{
+      // Delete user // mark as suspended instead of deleting to maintain data integrity and for audit purposes
+    await tx.update(users)
+    .set({ status: "Suspended" })
+    .where(eq(users.id, Number(id)));
 
     //change invitation status to suspended if the user is deleted
-    await db
+    await tx
       .update(userInvitations)
       .set({ status: "suspended" })
-      .where(eq(userInvitations.id, existingUser[0].id));
+      .where(eq(userInvitations.userId, existingUser[0].id));
+
+     
+})
+
 
     res.status(200).json({
       message: "User deleted successfully",

@@ -1,23 +1,28 @@
 const nodemailer = require("nodemailer");
 
-// Create Brevo SMTP transporter
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_PORT === 465, // true for 465, false for other ports (587)
+  host: process.env.MAILTRAP_HOST,
+  port: Number(process.env.MAILTRAP_PORT),
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  }
+    user: process.env.MAILTRAP_USER,
+    pass: process.env.MAILTRAP_PASS,
+  },
 });
 
-// Test the connection (optional - for debugging)
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("Nodemailer SMTP connection error:", error);
-  } else {
-    console.log("Nodemailer SMTP connection successful");
-  }
-});
+const sendMail = async (options) => {
+  try {
+    await transporter.sendMail({
+      from: process.env.SENDER_EMAIL,
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+    });
 
-module.exports = transporter;
+    console.log("Email sent successfully");
+  } catch (error) {
+    console.error("Mail error:", error);
+    throw new Error("Failed to send email");
+  }
+};
+
+module.exports = sendMail;

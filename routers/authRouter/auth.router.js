@@ -9,9 +9,4 @@ authRouter.post("/api/login", login);
 
 authRouter.post("/api/logout", AuthCheck, logout);
 
-// Auth route
-authRouter.get("/api/user", AuthCheck, (req, res) => {
-  res.json({ message: "api working" });
-});
-
 module.exports = authRouter;

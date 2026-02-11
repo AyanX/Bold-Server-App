@@ -3,6 +3,7 @@ const db= require('../../db/db');
 const { users, articles, categories, campaigns, pageViews, activityLogs } = require('../../drizzle/schema');
 const { eq, count, sql, desc, and, gte, lte } = require('drizzle-orm');
 
+
 class AnalyticsService {
   static async getDashboardStats() {
 
@@ -40,7 +41,7 @@ class AnalyticsService {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
+    const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const [todayPageViews] = await db
@@ -70,11 +71,11 @@ class AnalyticsService {
   static async getAudienceGrowth() {
     const months = [];
     for (let i = 5; i >= 0; i--) {
-      const date = new Date();
+      const date = new Date()
       date.setMonth(date.getMonth() - i);
 
       const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-      const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+      const endOfMonth = new Date (date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
 
       const [visitors] = await db
         .select({ count: sql`COUNT(DISTINCT ${pageViews.sessionId})` })
@@ -122,7 +123,7 @@ class AnalyticsService {
   static async getMonthlyPageViews() {
     const months = [];
     for (let i = 11; i >= 0; i--) {
-      const date = new Date();
+      const date =new Date();
       date.setMonth(date.getMonth() - i);
 
       const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);

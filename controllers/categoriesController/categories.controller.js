@@ -1,7 +1,7 @@
 const { categories, articles } = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq, like, sql } = require("drizzle-orm");
-const { capitalizeFirstLetter } = require("../utils");
+const { capitalizeFirstLetter, getMySQLDateTime } = require("../utils");
 
 const getAllCategories = async (req, res) => {
   try {
@@ -95,7 +95,7 @@ const createCategory = async (req, res) => {
     }
 
     // Insert new category
-    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const now = getMySQLDateTime()
 
     //  TRANSFORM THE NEW CATEGORY NAME TO USE FIRST LETTERS AS CAPITAL WORDS
 
@@ -272,10 +272,7 @@ const updateCategory = async (req, res) => {
     }
 
     // Always update the updatedAt timestamp
-    updateData.updatedAt = new Date()
-      .toISOString()
-      .replace("T", " ")
-      .slice(0, 19);
+    updateData.updatedAt = getMySQLDateTime()
 
     // Update category
     await db

@@ -8,25 +8,33 @@ const userManagementRouter = require("./routers/userManagementRouter/userManagem
 const settingsRouter = require("./routers/settingsRouter/settings.router");
 const profileRouter = require("./routers/profileRouter/profile.router");
 
-const cors = require("cors");
-const helmet = require("helmet");
-
-
 const authRouter = require("./routers/authRouter/auth.router");
 const analyticsRouter = require("./routers/analyticsRouter/analytics.router");
 const cookieParser = require("cookie-parser");
 const cookieParserMiddleware = require("./utils/middleware/cookieParser");
 const requestIp = require('request-ip')
 const swaggerUi = require("swagger-ui-express")
-
+const rateLImiter = require("express-rate-limit");
+const cors = require("cors");
+const helmet = require("helmet");
 const YAML = require("yamljs")
 
 const swaggerJSDocs = YAML.load("./api.yaml")
 
+//rate limiter configuration
+const limiter = rateLImiter({
+  windowMs: 40 * 60 * 1000, // 40 minutes
+  max: 1000, // limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again later",
+});
+
+
 const app = express();
 
-
+// Swagger API documentation route
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerJSDocs) )
+
+
 
 // Configure helmet to allow cross-origin resource loading for static assets
 app.use(
@@ -46,7 +54,8 @@ app.use(
   }),
 );
 app.use(cookieParser());
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
+
 
 //set a users ip in req.clientIp
 app.use(requestIp.mw());
@@ -66,8 +75,8 @@ app.use(
 );
 
 
-
-
+// Apply rate limiter to all requests
+app.use(limiter);
 
 //ATTACH USER FROM COOKIE TOKEN
 app.use(cookieParserMiddleware);

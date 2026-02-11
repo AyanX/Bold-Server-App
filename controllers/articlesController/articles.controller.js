@@ -12,6 +12,7 @@ const {
   blurBase64Image,
   saveBase64Image,
   getUser,
+  getMySQLDateTime,
 } = require("../utils");
 
 //create an array of all category slugs
@@ -96,7 +97,7 @@ const addNewArticle = async (req, res) => {
   } = req.body;
 
   try {
-    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const now = getMySQLDateTime()
 
     // Validate and format categories (MySQL SET requires array or comma-separated string)
     let categoriesValue = [];
@@ -355,7 +356,7 @@ const updateArticleById = async (req, res) => {
   } = req.body;
 
   try {
-    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const now = getMySQLDateTime()
 
     // Validate and format categories
     let categoriesValue = [];

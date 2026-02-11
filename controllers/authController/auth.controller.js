@@ -32,9 +32,10 @@ const login = async (req, res) => {
     }
 
     // Check if user is not suspended or pending
-    if (user.status === "Suspended" || user.status === "Pending") {
+    if (user.status.toLowerCase() === "suspended" || user.status.toLowerCase() === "pending") {
       return res.status(403).json({ message: "Account is not active" });
     }
+
 
     // Verify password
     const isPasswordValid = await comparePassword(password, user.password);
