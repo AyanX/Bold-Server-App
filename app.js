@@ -24,7 +24,7 @@ const swaggerJSDocs = YAML.load("./api.yaml")
 //rate limiter configuration
 const limiter = rateLImiter({
   windowMs: 40 * 60 * 1000, // 40 minutes
-  max: 1000, // limit each IP to 100 requests per windowMs
+  max: 100000000, // limit each IP to 1000 requests per windowMs
   message: "Too many requests from this IP, please try again later",
 });
 

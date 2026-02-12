@@ -30,7 +30,6 @@ const HandleRefresh = async (req, res, next) => {
     //returns id and email from refresh token payload
 
     const { id, email } = refreshPayload;
-    console.log("Refresh token for user ID:", id, "email:", email);
 
     // Check DB
     const stored = await db
@@ -38,6 +37,9 @@ const HandleRefresh = async (req, res, next) => {
       .from(refreshTokens)
       .where(eq(refreshTokens.userId, Number(id)))
       .limit(1);
+
+
+      console.log("New Access Token for ", id, email);
 
     if (!stored[0]) {
       return res.status(403).json({ message: "Refresh revoked" });
@@ -81,7 +83,7 @@ const HandleRefresh = async (req, res, next) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
+      maxAge: 25 * 60 * 1000,
     });
 
     // Attach user & continue

@@ -32,10 +32,12 @@ const login = async (req, res) => {
     }
 
     // Check if user is not suspended or pending
-    if (user.status.toLowerCase() === "suspended" || user.status.toLowerCase() === "pending") {
+    if (
+      user.status.toLowerCase() === "suspended" ||
+      user.status.toLowerCase() === "pending"
+    ) {
       return res.status(403).json({ message: "Account is not active" });
     }
-
 
     // Verify password
     const isPasswordValid = await comparePassword(password, user.password);
@@ -103,7 +105,7 @@ const login = async (req, res) => {
           .delete(refreshTokens)
           .where(eq(refreshTokens.userId, Number(user.id)));
       } catch (err) {
-        console.log("Logging in ", user.name)
+        console.error("Error deleting existing refresh tokens:", err);
       }
 
       //  Insert refresh token

@@ -1,4 +1,4 @@
-const { users, userInvitations, articles } = require("../../drizzle/schema");
+const { users, userInvitations, articles, refreshTokens } = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq, like } = require("drizzle-orm");
 const crypto = require("crypto");
@@ -315,7 +315,10 @@ const deleteUser = async (req, res) => {
       .set({ status: "suspended" })
       .where(eq(userInvitations.userId, existingUser[0].id));
 
-     
+
+          // delete user token if it exists
+
+    await tx.delete(refreshTokens).where(eq(refreshTokens.userId, existingUser[0].id));
 })
 
 
@@ -324,9 +327,10 @@ const deleteUser = async (req, res) => {
       status: 200,
     });
 
-    // delete user token if it exists
 
-    await db.delete().return;
+    
+    
+    return;
   } catch (error) {
     console.error(" Error deleting user:", error);
     res.status(500).json({

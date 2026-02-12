@@ -5,6 +5,7 @@ const {
 } = require("../../drizzle/schema");
 const db = require("../../db/db");
 const { eq, sql, and, desc } = require("drizzle-orm");
+const redis = require("../../utils/redis.client");
 
 const {
   createSlug,
@@ -25,8 +26,8 @@ function mapArticle(article) {
   );
   return {
     id: String(article.id),
-    title: article.title,
-    slug: article.slug,
+    title: String(article.title),
+    slug: String(article.slug),
     excerpt: article.excerpt ?? "",
     image: article.image,
     category: article.category,
@@ -54,12 +55,28 @@ function mapArticle(article) {
 
 const getAllArticles = async (req, res) => {
   try {
+    // check if articles are cached in redis
+    const cachedArticles = await redis.get("all_articles");
+
+    if (cachedArticles) {
+      const articlesData = JSON.parse(cachedArticles);
+
+      return res.status(200).json({
+        data: articlesData,
+        status: 200,
+        message: "Articles fetched successfully (from cache)",
+      });
+    }
+
     const allArticles = await db
       .select()
       .from(articles)
       .orderBy(desc(articles.created_at));
 
     const mappedArticles = allArticles.map((article) => mapArticle(article));
+
+    // cache the articles in redis with an expiration time of 10 minutes (600 seconds)
+    await redis.set("all_articles", JSON.stringify(mappedArticles), "EX", 600);
 
     return res.status(200).json({
       data: mappedArticles,
@@ -73,8 +90,7 @@ const getAllArticles = async (req, res) => {
 };
 
 const addNewArticle = async (req, res) => {
-  const {id,name}= getUser(req)
-
+  const { id, name } = getUser(req);
 
   if (!id) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -97,7 +113,7 @@ const addNewArticle = async (req, res) => {
   } = req.body;
 
   try {
-    const now = getMySQLDateTime()
+    const now = getMySQLDateTime();
 
     // Validate and format categories (MySQL SET requires array or comma-separated string)
     let categoriesValue = [];
@@ -107,22 +123,6 @@ const addNewArticle = async (req, res) => {
 
     // to do :::: attach the slug of the category to the categories field , .... frontend filtering logics...
 
-    // Update category article counts for existing categories
-
-    for (const cat of categoriesValue) {
-      //ensure cat is string before calling toLowerCase
-      if (typeof cat !== "string") {
-        continue;
-      }
-
-      await db
-        .update(categoriesDb)
-        .set({
-          articleCount: sql`${categoriesDb.articleCount} + 1`,
-        })
-        .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
-    }
-
     //find the image of the author and attach it to the article
     const authorUser = await db
       .select()
@@ -130,31 +130,51 @@ const addNewArticle = async (req, res) => {
       .where(eq(users.id, id))
       .limit(1);
 
+    // define the latest article which is being added
+    const articleToAdd = {
+      categories: capitalizeFirstLetter(JSON.stringify(categoriesValue)),
+      title,
+      slug,
+      excerpt,
+      author_id: Number(id),
+      category: capitalizeFirstLetter(category),
+      image,
+      author: author
+        ? capitalizeFirstLetter(author)
+        : capitalizeFirstLetter(name),
+      read_time,
+      is_prime,
+      status: capitalizeFirstLetter(status) || "Published",
+      content,
+      is_headline,
+      seo_score,
+      created_at: now,
+      updated_at: now,
+      author_image: authorUser.length ? authorUser[0].image : null,
+    };
+
+    let latestArticle;
+
     //save image as url
     //if categories or tags are arrays, turn them into json objects
     await db.transaction(async (tx) => {
+      // Update category article counts for existing categories
+
+      for (const cat of categoriesValue) {
+        //ensure cat is string before calling toLowerCase
+        if (typeof cat !== "string") {
+          continue;
+        }
+
+        await db
+          .update(categoriesDb)
+          .set({
+            articleCount: sql`${categoriesDb.articleCount} + 1`,
+          })
+          .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`);
+      }
       // insert article
-      await tx.insert(articles).values({
-        categories: capitalizeFirstLetter(JSON.stringify(categoriesValue)),
-        title,
-        slug,
-        excerpt,
-        author_id: Number(id),
-        category: capitalizeFirstLetter(category),
-        image,
-        author: author
-          ? capitalizeFirstLetter(author)
-          : capitalizeFirstLetter(name),
-        read_time,
-        is_prime,
-        status: capitalizeFirstLetter(status) || "Published",
-        content,
-        is_headline,
-        seo_score,
-        created_at: now,
-        updated_at: now,
-        author_image: authorUser.length ? authorUser[0].image : null,
-      });
+      await tx.insert(articles).values(articleToAdd);
 
       // update user article counts
       await tx
@@ -175,19 +195,21 @@ const addNewArticle = async (req, res) => {
               : sql`${users.articles_pending}`,
         })
         .where(eq(users.id, id));
+
+      // fetch the latest article added to return in response
+      latestArticle = await tx
+        .select()
+        .from(articles)
+        .orderBy(desc(articles.id))
+        .limit(1);
     });
 
     // resend latest article added
+  if (!latestArticle.length) {
+      return res.status(500).json({ error: "Failed to retrieve added article" });
+    }
 
-    const latestArticle = await db
-      .select()
-      .from(articles)
-      .orderBy(sql`${articles.created_at} DESC`)
-      .limit(1);
-
-    const dbArticle = latestArticle[0];
-
-    const mappedArticle = mapArticle(dbArticle);
+    const mappedArticle = mapArticle(latestArticle[0]);
 
     //return the article added as response
 
@@ -254,7 +276,7 @@ const addNewArticle = async (req, res) => {
     // categories does not match its slug in db
 
     for (const cat of categoriesValue) {
-       if (typeof cat !== "string") {
+      if (typeof cat !== "string") {
         continue;
       }
       const categoryRow = await db
@@ -277,6 +299,17 @@ const addNewArticle = async (req, res) => {
       .update(articles)
       .set({ categories: JSON.stringify(categoriesValue) })
       .where(eq(articles.slug, slug));
+
+    // update redis cache for all articles to include the new article with its category slugs
+    const allArticles = await db
+      .select()
+      .from(articles)
+      .orderBy(desc(articles.created_at));
+
+    const mappedArticles = allArticles.map((article) => mapArticle(article));
+
+    // cache the updated articles in redis with an expiration time of 10 minutes (600 seconds)
+    await redis.set("all_articles", JSON.stringify(mappedArticles), "EX", 600);
 
     return;
   } catch (error) {
@@ -330,8 +363,7 @@ const getArticleByIdOrSlug = async (req, res) => {
 const updateArticleById = async (req, res) => {
   const { id } = req.params;
 
-
-  const {id:reqId} = getUser(req)
+  const { id: reqId } = getUser(req);
   //validate user exists
   if (!reqId) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -356,7 +388,7 @@ const updateArticleById = async (req, res) => {
   } = req.body;
 
   try {
-    const now = getMySQLDateTime()
+    const now = getMySQLDateTime();
 
     // Validate and format categories
     let categoriesValue = [];
@@ -388,7 +420,7 @@ const updateArticleById = async (req, res) => {
       requestUserRole !== "admin"
     ) {
       // In case a user changed name, fall back to checking author_id
-      if (existingArticle[0]?.author_id !== Number(req.user.id)) {
+      if (existingArticle[0]?.author_id !== Number(req.user?.id)) {
         console.log(
           "Forbidden: User is not the author or admin",
           req.user?.role,
@@ -404,7 +436,7 @@ const updateArticleById = async (req, res) => {
     // Update category article counts for existing categories, decrement old categories
 
     for (const cat of oldCategories) {
-       if (typeof cat !== "string") {
+      if (typeof cat !== "string") {
         continue;
       }
       await db
@@ -417,7 +449,7 @@ const updateArticleById = async (req, res) => {
     // Update category article counts for new categories, increment new categories
 
     for (const cat of categoriesValue) {
-         if (typeof cat !== "string") {
+      if (typeof cat !== "string") {
         continue;
       }
       await db
@@ -511,15 +543,15 @@ const updateArticleById = async (req, res) => {
       .where(eq(users.id, existingArticle[0].author_id));
 
     // send the updated article as response
-   res.status(200).json({
+    res.status(200).json({
       data: mappedArticle,
       message: "Article updated successfully",
       status: 200,
     });
-  // update the new categories with the article slug for better frontend filtering
-  // . find added categories not in old categories and attach the article slug to them
+    // update the new categories with the article slug for better frontend filtering
+    // . find added categories not in old categories and attach the article slug to them
     for (const cat of categoriesValue) {
-         if (typeof cat !== "string") {
+      if (typeof cat !== "string") {
         continue;
       }
       if (!oldCategories.includes(cat)) {
@@ -530,8 +562,8 @@ const updateArticleById = async (req, res) => {
           .where(sql`LOWER(${categoriesDb.name}) = ${cat.toLowerCase()}`)
           .limit(1);
 
-        if(categoryRow.length < 1) {
-          return
+        if (categoryRow.length < 1) {
+          return;
         }
         // the slug
         const categorySlug = categoryRow[0].slug;
@@ -595,10 +627,9 @@ const deleteArticleById = async (req, res) => {
     .where(eq(articles.id, Number(id)))
     .limit(1);
   // If article doesn't exist, return 404
-    if(!existingArticle.length || !existingArticle[0]) {
-      return res.status(404).json({ error: "Article not found" });
-    }
-
+  if (!existingArticle.length || !existingArticle[0]) {
+    return res.status(404).json({ error: "Article not found" });
+  }
 
   try {
     // Find the requesting user row (limit 1 for safety)
@@ -661,9 +692,9 @@ const deleteArticleById = async (req, res) => {
 
       // update category counts
       for (const cat of articleCategories) {
-           if (typeof cat !== "string") {
-        continue;
-      }
+        if (typeof cat !== "string") {
+          continue;
+        }
 
         await tx
           .update(categoriesDb)
@@ -706,7 +737,7 @@ const trackView = async (req, res) => {
     //update category views count for categories
 
     for (const cat of viewedArticleCategories) {
-         if (typeof cat !== "string") {
+      if (typeof cat !== "string") {
         continue;
       }
       await db

@@ -95,7 +95,7 @@ const createCategory = async (req, res) => {
     }
 
     // Insert new category
-    const now = getMySQLDateTime()
+    const now = getMySQLDateTime();
 
     //  TRANSFORM THE NEW CATEGORY NAME TO USE FIRST LETTERS AS CAPITAL WORDS
 
@@ -272,7 +272,7 @@ const updateCategory = async (req, res) => {
     }
 
     // Always update the updatedAt timestamp
-    updateData.updatedAt = getMySQLDateTime()
+    updateData.updatedAt = getMySQLDateTime();
 
     // Update category
     await db
@@ -299,33 +299,32 @@ const updateCategory = async (req, res) => {
       existingCategory[0].slug !== updateData.slug &&
       updateData.slug !== undefined
     ) {
+      const articlesToUpdate = await db
+        .select()
+        .from(articles)
+        .where(
+          like(
+            articles.categories,
+            `%${existingCategory[0].slug.toLowerCase()}%`,
+          ),
+        );
+
+      for (const article of articlesToUpdate) {
+        const articleCategories = JSON.parse(article.categories);
+        const updatedCategories = articleCategories.map((cat) => {
+          if (cat.toLowerCase() === existingCategory[0].slug.toLowerCase()) {
+            return updateData.slug;
+          }
+          return cat;
+        });
+
+        await db
+          .update(articles)
+          .set({ categories: JSON.stringify(updatedCategories) })
+          .where(eq(articles.id, article.id));
+      }
     }
     // for each articles, get categories, parse them, find the category with the old slug, replace it with the new slug, then update the article with the new categories
-
-    const articlesToUpdate = await db
-      .select()
-      .from(articles)
-      .where(
-        like(
-          articles.categories,
-          `%${existingCategory[0].slug.toLowerCase()}%`,
-        ),
-      );
-
-    for (const article of articlesToUpdate) {
-      const articleCategories = JSON.parse(article.categories);
-      const updatedCategories = articleCategories.map((cat) => {
-        if (cat.toLowerCase() === existingCategory[0].slug.toLowerCase()) {
-          return updateData.slug;
-        }
-        return cat;
-      });
-
-      await db
-        .update(articles)
-        .set({ categories: JSON.stringify(updatedCategories) })
-        .where(eq(articles.id, article.id));
-    }
 
     return;
   } catch (error) {

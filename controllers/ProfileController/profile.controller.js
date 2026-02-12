@@ -8,6 +8,7 @@ const {
   getUser,
   sensitiveFields,
   safeUser,
+  getMySQLDateTime,
 } = require("../utils");
 
 const uploadProfileImage = async (req, res) => {
@@ -74,6 +75,8 @@ const getProfile = async (req, res) => {
   try {
     const { email } = getUser(req, res);
 
+ if (!email) {return res.status(401).json({ message: "Unauthorized", status: 401, }); }
+
     //fetch user from database
     const userFound = await db
       .select()
@@ -102,7 +105,7 @@ const getProfile = async (req, res) => {
         status: 401,
       });
     }
-    console.error("❌ Error fetching user profile:", error);
+    console.error(" Error fetching user profile:", error);
     return res.status(500).json({
       status: 500,
       message: "Internal server error",
@@ -143,6 +146,7 @@ const updateProfile = async (req, res) => {
     if (name !== undefined) updateData.name = name;
     if (bio !== undefined) updateData.bio = bio;
     if (email !== undefined) updateData.email = email;
+    updateData.updated_at = getMySQLDateTime(); // Update the updated_at timestamp
 
     // Only update if at least one field is provided
     if (Object.keys(updateData).length === 0) {

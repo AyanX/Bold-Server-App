@@ -1,10 +1,10 @@
 //  /api/analytics
 const { pageViews } = require("../../drizzle/schema");
 const db = require("../../db/db");
-const {AnalyticsService }= require("./analytics.helper");
+const { AnalyticsService } = require("./analytics.helper");
 const { getClientIp, getMySQLDateTime } = require("../utils");
 
-const redis = require  ('../../utils/redis.client');
+const redis = require("../../utils/redis.client");
 
 const CACHE_TTL = 60 * 60 * 24; // 24 hours caching for IP data
 
@@ -19,9 +19,9 @@ const postAnalyticsData = async (req, res) => {
 
     if (cachedData) {
       data = JSON.parse(cachedData);
-      console.log('Redis cache HIT for IP:', ip);
+      console.log("Redis cache HIT for IP:", ip);
     } else {
-      console.log('Redis cache MISS → calling ipapi');
+      console.log("Redis cache MISS → calling ipapi");
 
       const response = await fetch(`https://ipapi.co/${ip}/json/`);
 
@@ -61,19 +61,17 @@ const postAnalyticsData = async (req, res) => {
 
     await db.insert(pageViews).values(pageViewData);
     return res.status(200).json({
-      message: 'Location data fetched successfully',
+      message: "Location data fetched successfully",
       data: pageViewData,
     });
-
   } catch (error) {
-    console.error('Error fetching location data:', error);
-    return res.status(500).json({ message: 'Failed to fetch location data' });
+    console.error("Error fetching location data:", error);
+    return res.status(500).json({ message: "Failed to fetch location data" });
   }
 };
 
-
-const getDashboardStats =async  (req,res)=>{
-     try {
+const getDashboardStats = async (req, res) => {
+  try {
     const [
       stats,
       audienceGrowth,
@@ -100,7 +98,7 @@ const getDashboardStats =async  (req,res)=>{
 
     res.json({
       data: {
-        stats : {...stats, activeVisitors: liveTraffic.length},
+        stats: { ...stats, activeVisitors: liveTraffic.length },
         audienceGrowth,
         dailyPageViews,
         monthlyPageViews,
@@ -110,19 +108,17 @@ const getDashboardStats =async  (req,res)=>{
         articlesByCategory,
         usersByRole,
         liveTraffic,
-        
       },
       status: 200,
     });
   } catch (error) {
-    console.error('Dashboard error:', error);
+    console.error("Dashboard error:", error);
     res.status(500).json({
-      message: 'Failed to fetch dashboard data',
+      message: "Failed to fetch dashboard data",
       status: 500,
     });
   }
-}
-
+};
 
 module.exports = {
   postAnalyticsData,

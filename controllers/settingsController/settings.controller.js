@@ -184,7 +184,9 @@ async function getSystemStats(req, res) {
   GROUP BY table_schema
 `);
     const database_size =
-      result[0][0] && result[0][0].size_mb ? `${result[0][0].size_mb} MB` : "Null";
+      result[0][0] && result[0][0].size_mb
+        ? `${result[0][0].size_mb} MB`
+        : "Null";
 
     // For last_backup, since it's not in the schema
     const lastBackup = "2026-01-26T06:00:00Z";
@@ -230,7 +232,10 @@ async function getSystemStats(req, res) {
 
 const sideBarCollapsed = async (req, res) => {
   try {
-    const collapsed = await db.select().from(settings).where(eq(settings.key, "sidebar_collapsed"));
+    const collapsed = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "sidebar_collapsed"));
     if (collapsed.length === 0) {
       return res.status(404).json({
         status: 404,
@@ -240,7 +245,8 @@ const sideBarCollapsed = async (req, res) => {
     // Normalize stored value to a real boolean. The DB stores values as strings
     // so ensure we interpret "true"/"1" as true and everything else as false.
     const rawVal = collapsed[0].value;
-    const collapsedBool = rawVal === true || rawVal === 'true' || rawVal === '1';
+    const collapsedBool =
+      rawVal === true || rawVal === "true" || rawVal === "1";
 
     return res.status(200).json({
       status: 200,
@@ -257,22 +263,29 @@ const sideBarCollapsed = async (req, res) => {
       error: error.message,
     });
   }
-}
+};
 
-const articleSettings = async( req,res)=>{
+const articleSettings = async (req, res) => {
   try {
-    const default_status = await db.select().from(settings).where(eq(settings.key, "default_article_status"));
-  const require_featured_image = await db.select().from(settings).where(eq(settings.key, "require_featured_image"));
+    const default_status = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "default_article_status"));
+    const require_featured_image = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "require_featured_image"));
 
-  const isImageRequired =  require_featured_image[0].value === true || require_featured_image[0].value === 'true' || require_featured_image[0].value=== '1';
-  return res.status(200).json({
-    data:{
-      default_status:default_status[0].value,
-      require_featured_image: isImageRequired
-    }
-  })
-
-
+    const isImageRequired =
+      require_featured_image[0].value === true ||
+      require_featured_image[0].value === "true" ||
+      require_featured_image[0].value === "1";
+    return res.status(200).json({
+      data: {
+        default_status: default_status[0].value,
+        require_featured_image: isImageRequired,
+      },
+    });
   } catch (error) {
     console.error("Error fetching article settings:", error);
     return res.status(500).json({
@@ -281,11 +294,7 @@ const articleSettings = async( req,res)=>{
       error: error.message,
     });
   }
-
-
-
-}
-
+};
 
 module.exports = {
   getSettings,
@@ -293,5 +302,5 @@ module.exports = {
   getSystemStats,
   putSettings,
   passwordUpdate,
-  sideBarCollapsed
+  sideBarCollapsed,
 };
