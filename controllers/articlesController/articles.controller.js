@@ -61,6 +61,7 @@ const getAllArticles = async (req, res) => {
     if (cachedArticles) {
       const articlesData = JSON.parse(cachedArticles);
 
+
       return res.status(200).json({
         data: articlesData,
         status: 200,
@@ -77,6 +78,7 @@ const getAllArticles = async (req, res) => {
 
     // cache the articles in redis with an expiration time of 10 minutes (600 seconds)
     await redis.set("all_articles", JSON.stringify(mappedArticles), "EX", 600);
+
 
     return res.status(200).json({
       data: mappedArticles,
@@ -205,8 +207,10 @@ const addNewArticle = async (req, res) => {
     });
 
     // resend latest article added
-  if (!latestArticle.length) {
-      return res.status(500).json({ error: "Failed to retrieve added article" });
+    if (!latestArticle.length) {
+      return res
+        .status(500)
+        .json({ error: "Failed to retrieve added article" });
     }
 
     const mappedArticle = mapArticle(latestArticle[0]);

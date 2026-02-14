@@ -18,6 +18,8 @@ const rateLImiter = require("express-rate-limit");
 const cors = require("cors");
 const helmet = require("helmet");
 const YAML = require("yamljs")
+const morgan = require('morgan');
+
 
 const swaggerJSDocs = YAML.load("./api.yaml")
 
@@ -30,7 +32,6 @@ const limiter = rateLImiter({
 
 
 const app = express();
-
 // Swagger API documentation route
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerJSDocs) )
 
@@ -53,14 +54,17 @@ app.use(
     credentials: true,
   }),
 );
+
+
 app.use(cookieParser());
 app.set('trust proxy', 1);
 
 
+// Enable ETag generation for caching
+app.set('etag', true);
+
 //set a users ip in req.clientIp
 app.use(requestIp.mw());
-
-
 
 // Serve static files from public directory (for uploads)
 // Ensure CORS header is present on static responses so frontend can load images
@@ -81,6 +85,15 @@ app.use(limiter);
 //ATTACH USER FROM COOKIE TOKEN
 app.use(cookieParserMiddleware);
 
+// Articles routes
+app.use("/api/articles", articlesRouter);
+
+// Use morgan for logging in development mode
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
+
+
 //auth router
 app.use(authRouter);
 
@@ -89,8 +102,7 @@ app.get("/", (req, res) => {
   res.json({ message: "api working" });
 });
 
-// Articles routes
-app.use("/api/articles", articlesRouter);
+
 
 // Categories routes
 app.use("/api/categories", categoriesRouter);
@@ -144,7 +156,4 @@ app.use("/api/settings", settingsRouter);
 app.get("/api/settings/performance", (req, res) => {
   res.json({ message: "api working" });
 });
-
-
-
-module.exports = app;
+module.exports = app
